@@ -1,0 +1,34 @@
+query AllEvents @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  events {
+    id
+    name
+    date
+    location
+    description
+  }
+}
+
+query MyTickets @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  tickets(where: { userId: { eq_expr: "auth.uid" } }) {
+    id
+    eventId
+    event {
+      name
+      date
+      location
+    }
+    purchaseDate
+  }
+}
+
+mutation PurchaseTicket($eventId: UUID!) @auth(level: USER) {
+  ticket_insert(data: {
+    eventId: $eventId,
+    userId_expr: "auth.uid",
+    purchaseDate_expr: "request.time"
+  })
+}
+
+mutation CancelTicket($ticketId: UUID!) @auth(level: USER) {
+  ticket_delete(key: { id: $ticketId })
+}

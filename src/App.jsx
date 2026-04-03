@@ -1,0 +1,694 @@
+import { useState, useEffect, useRef } from 'react';
+import FloodMap from './components/FloodMap';
+import BottomSheet from './components/BottomSheet';
+import MobileHeader from './components/MobileHeader';
+import FloatingActions from './components/FloatingActions';
+import HotspotDetail from './components/HotspotDetail';
+import NavigationPanel from './components/NavigationPanel';
+import ReportFloodPanel from './components/ReportFloodPanel';
+import LoginPrompt from './components/LoginPrompt';
+import { floodHotspots, getStatusFromWaterLevel } from './data/mockData';
+import { getSmartRoute, createFloodZones, formatDuration, formatDistance, checkRouteIntersection } from './services/routingService';
+import { subscribeToFloodData } from './services/firebase';
+import { useAuth } from './contexts/AuthContext';
+import Toast from './components/Toast';
+
+function App() {
+  const { user, requireAuth, logout } = useAuth();
+  const [toast, setToast] = useState(null);
+  const [hotspots, setHotspots] = useState(floodHotspots);
+  const [selectedHotspot, setSelectedHotspot] = useState(null);
+  const [destination, setDestination] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Routing state
+  const [routeData, setRouteData] = useState(null);
+  const [floodZones, setFloodZones] = useState(null);
+  const [isRouting, setIsRouting] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [userHeading, setUserHeading] = useState(0);
+  const [showNavigationPanel, setShowNavigationPanel] = useState(false);
+  const [originLocation, setOriginLocation] = useState(null);
+  const [destLocation, setDestLocation] = useState(null);
+  const [isFollowMode, setIsFollowMode] = useState(false);
+
+  // Crowdsourcing state
+  const [crowdsourcedReports, setCrowdsourcedReports] = useState([]);
+  const [showReportPanel, setShowReportPanel] = useState(false);
+
+  // UI state
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showHistoricalData, setShowHistoricalData] = useState(false);
+
+  // Ref for map controls and previous location
+  const mapRef = useRef(null);
+  const prevLocationRef = useRef(null);
+  const watchIdRef = useRef(null);
+
+  // Calculate heading from previous to current position
+  const calculateHeading = (prev, current) => {
+    if (!prev || !current) return 0;
+    const dx = current[0] - prev[0];
+    const dy = current[1] - prev[1];
+    // Only update heading if we've moved a significant amount
+    if (Math.abs(dx) < 0.00001 && Math.abs(dy) < 0.00001) return null;
+    // Convert to degrees (0 = North, 90 = East)
+    const angle = Math.atan2(dx, dy) * (180 / Math.PI);
+    return (angle + 360) % 360;
+  };
+
+  // Continuous GPS tracking
+  useEffect(() => {
+    if (navigator.geolocation) {
+      // Initial position
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = [position.coords.longitude, position.coords.latitude];
+          setUserLocation(newLocation);
+          prevLocationRef.current = newLocation;
+
+          // Use device heading if available
+          if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
+            setUserHeading(position.coords.heading);
+          }
+        },
+        (error) => {
+          console.error('Initial location error:', error);
+          // Default to Lipa City center if location unavailable
+          setUserLocation([121.1589, 13.9411]);
+        },
+        { enableHighAccuracy: true }
+      );
+
+      // Watch position for real-time updates
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          const newLocation = [position.coords.longitude, position.coords.latitude];
+
+          // Calculate heading from movement if device heading not available
+          if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
+            setUserHeading(position.coords.heading);
+          } else if (prevLocationRef.current) {
+            const calculatedHeading = calculateHeading(prevLocationRef.current, newLocation);
+            if (calculatedHeading !== null) {
+              setUserHeading(calculatedHeading);
+            }
+          }
+
+          setUserLocation(newLocation);
+          prevLocationRef.current = newLocation;
+        },
+        (error) => {
+          console.error('Watch position error:', error);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 10000
+        }
+      );
+
+      // Cleanup on unmount
+      return () => {
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+      };
+    } else {
+      setUserLocation([121.1589, 13.9411]);
+    }
+  }, []);
+
+  // Update flood zones when hotspots change
+  useEffect(() => {
+    const zones = createFloodZones(hotspots);
+    setFloodZones(zones);
+  }, [hotspots]);
+
+  // Simulate real-time data updates
+  useEffect(() => {
+    const unsubscribe = subscribeToFloodData((data) => {
+      if (data && data.length > 0) {
+        setHotspots(data);
+        setLastUpdate(new Date());
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+
+  const handleHotspotSelect = (hotspot) => {
+    setSelectedHotspot(hotspot);
+    if (isBottomSheetExpanded) {
+      setIsBottomSheetExpanded(false);
+    }
+  };
+
+  // Navigate with coordinates
+  const handleNavigateWithCoords = async (origin, dest) => {
+    setIsRouting(true);
+    try {
+      const result = await getSmartRoute(origin, dest, hotspots);
+
+      if (result.success) {
+        setRouteData(result);
+        setShowNavigationPanel(false);
+        setSelectedHotspot(null);
+        setIsFollowMode(true); // Start following user like Google Maps
+        setToast({ message: 'Route found! Follow blue line.', type: 'info' });
+      } else {
+        setToast({ message: 'Could not find a route: ' + result.error, type: 'error' });
+      }
+    } catch (error) {
+      console.error('Routing error:', error);
+      setToast({ message: 'Error calculating route', type: 'error' });
+    } finally {
+      setIsRouting(false);
+    }
+  };
+
+  // Recalculate route if current route becomes flooded due to sensor updates
+  const lastCheckedZonesRef = useRef(null);
+  useEffect(() => {
+    if (!routeData || !routeData.safeRoute || isRouting || !floodZones) return;
+    if (lastCheckedZonesRef.current === floodZones) return;
+    
+    lastCheckedZonesRef.current = floodZones;
+
+    const routeGeoJSON = {
+      type: 'Feature',
+      geometry: routeData.safeRoute.geometry
+    };
+    
+    const intersection = checkRouteIntersection(routeGeoJSON, floodZones);
+
+    if (intersection.intersects) {
+      setToast({ message: 'High flood levels detected on your route! Re-routing to a safer way...', type: 'warning' });
+      const currentOrigin = userLocation || routeData.origin;
+      handleNavigateWithCoords(currentOrigin, routeData.destination);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [floodZones, routeData, isRouting, userLocation]);
+
+  // Navigate to a hotspot
+  const handleNavigate = async (hotspot) => {
+    if (!requireAuth()) return;
+    if (!userLocation) {
+      setToast({ message: 'Could not get your location. Please enable location services.', type: 'error' });
+      return;
+    }
+
+    const dest = [hotspot.coordinates[1], hotspot.coordinates[0]];
+    setDestination(hotspot.name);
+    await handleNavigateWithCoords(userLocation, dest);
+  };
+
+  // Search for destination and navigate (from enhanced search)
+  const handleSelectDestination = async (location) => {
+    if (!requireAuth()) return;
+    if (!userLocation) {
+      setToast({ message: 'Could not get your location. Please enable location services.', type: 'error' });
+      return;
+    }
+    setDestination(location.name);
+    setDestLocation(location);
+    await handleNavigateWithCoords(userLocation, location.coordinates);
+  };
+
+  // Clear route
+  const handleClearRoute = () => {
+    setRouteData(null);
+    setDestination('');
+    setDestLocation(null);
+    setIsFollowMode(false);
+  };
+
+  // Refresh button handler
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      // Data updates in real-time via Firebase, this just updates the UI loading state
+      setIsRefreshing(false);
+    }, 1000);
+  };
+
+  // Recenter button handler
+  const handleRecenter = () => {
+    setSelectedHotspot(null);
+    handleClearRoute();
+    setShowNavigationPanel(false);
+    if (mapRef.current) {
+      mapRef.current.flyToCenter();
+    }
+  };
+
+  // My Location button handler
+  const handleMyLocation = () => {
+    if (mapRef.current) {
+      mapRef.current.getCurrentLocation();
+    }
+  };
+
+  // Open navigation panel
+  const handleOpenNavigation = () => {
+    if (!requireAuth()) return;
+    setShowNavigationPanel(true);
+    setSelectedHotspot(null);
+  };
+
+  // Handle crowdsourced flood report submission
+  const handleReportSubmit = (report) => {
+    setCrowdsourcedReports(prev => [...prev, report]);
+    setToast({ message: 'Flood report submitted successfully!', type: 'success' });
+
+    // Also add to flood zones if severity is warning or flooded
+    if (report.severity === 'warning' || report.severity === 'flooded') {
+      const newHotspot = {
+        id: report.id,
+        name: report.locationName.split(',')[0] || 'User Report',
+        location: report.locationName,
+        coordinates: report.coordinates,
+        waterLevel: report.severity === 'flooded' ? 80 : 50,
+        status: report.severity,
+        lastUpdate: report.reportedAt,
+        type: 'crowdsourced',
+        verified: false,
+      };
+      setHotspots(prev => [...prev, newHotspot]);
+    }
+  };
+
+  return (
+    <div className="h-full w-full bg-[#0a1628] overflow-hidden relative">
+      {/* Portal target for expanded search (must be at app root to escape BottomSheet overflow) */}
+      <div id="search-portal" className="absolute inset-0 z-[2500] pointer-events-none [&>*]:pointer-events-auto" />
+      {/* Mobile Header */}
+      <MobileHeader
+        lastUpdate={lastUpdate}
+        onMenuClick={() => setIsMobileMenuOpen(true)}
+        onNavigateClick={handleOpenNavigation}
+      />
+
+      {/* Map Container */}
+      <div className="absolute inset-0 pt-16">
+        <FloodMap
+          ref={mapRef}
+          hotspots={hotspots}
+          selectedHotspot={selectedHotspot}
+          onHotspotSelect={handleHotspotSelect}
+          routeData={routeData}
+          floodZones={floodZones}
+          userLocation={userLocation}
+          userHeading={userHeading}
+          isFollowMode={isFollowMode}
+          onFollowModeChange={setIsFollowMode}
+          showHistoricalData={showHistoricalData}
+          onError={(msg) => setToast({ message: msg, type: 'error' })}
+        />
+      </div>
+
+      {/* Navigation Panel */}
+      {showNavigationPanel && (
+        <NavigationPanel
+          origin={originLocation}
+          destination={destLocation}
+          onOriginChange={setOriginLocation}
+          onDestinationChange={(loc) => {
+            setDestLocation(loc);
+            if (loc) setDestination(loc.name);
+          }}
+          onNavigate={handleNavigateWithCoords}
+          onClose={() => setShowNavigationPanel(false)}
+          isRouting={isRouting}
+          userLocation={userLocation}
+        />
+      )}
+
+      {/* Report Flood Panel */}
+      <ReportFloodPanel
+        isOpen={showReportPanel}
+        onClose={() => setShowReportPanel(false)}
+        userLocation={userLocation}
+        onSubmit={handleReportSubmit}
+        onError={(msg) => setToast({ message: msg, type: 'error' })}
+      />
+
+
+      {/* Floating Action Buttons */}
+      <FloatingActions
+        onNavigate={handleOpenNavigation}
+        onReport={() => setShowReportPanel(true)}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+      />
+
+      {/* Route Summary Card */}
+      {routeData?.safeRoute && !showNavigationPanel && (
+        <div className="absolute left-3 right-3 bottom-[290px] z-[1001]">
+          <div className={`glass rounded-2xl p-3 shadow-xl border ${routeData.safeRoute.isFlooded
+            ? 'border-red-500/30'
+            : 'border-emerald-500/30'
+            }`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                {routeData.safeRoute.isFlooded ? (
+                  <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-bold text-white text-sm">{destination || 'Route'}</h3>
+                  <p className={`text-[10px] ${routeData.safeRoute.isFlooded ? 'text-red-300' : 'text-emerald-300'
+                    }`}>
+                    {routeData.safeRoute.isFlooded ? 'Flood on route!' : 'Safe route'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleClearRoute}
+                className="w-7 h-7 rounded-lg bg-[#162d4d] flex items-center justify-center text-slate-400 active:scale-95"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Route Stats */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 bg-[#0a1628] rounded-lg text-center">
+                <p className="text-lg font-bold text-[#00d4ff]">
+                  {formatDuration(routeData.safeRoute.duration)}
+                </p>
+                <p className="text-[9px] text-slate-400">duration</p>
+              </div>
+              <div className="p-2 bg-[#0a1628] rounded-lg text-center">
+                <p className="text-lg font-bold text-[#00d4ff]">
+                  {formatDistance(routeData.safeRoute.distance)}
+                </p>
+                <p className="text-[9px] text-slate-400">distance</p>
+              </div>
+            </div>
+
+            {/* Warning for flooded routes */}
+            {routeData.safeRoute.isFlooded && routeData.warnings?.length > 0 && (
+              <div className="mt-2 p-2 bg-red-500/10 rounded-lg">
+                <p className="text-[10px] text-red-300">
+                  ⚠️ Route crosses: {routeData.warnings.map(w => w.name).join(', ')}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Hotspot Detail Card (only show if no route and no nav panel) */}
+      {selectedHotspot && !routeData && !showNavigationPanel && (
+        <HotspotDetail
+          hotspot={selectedHotspot}
+          onClose={() => setSelectedHotspot(null)}
+          onNavigate={() => handleNavigate(selectedHotspot)}
+          isRouting={isRouting}
+        />
+      )}
+
+      {/* Bottom Sheet */}
+      <BottomSheet
+        hotspots={hotspots}
+        selectedHotspot={selectedHotspot}
+        onHotspotSelect={handleHotspotSelect}
+        onSelectDestination={handleSelectDestination}
+        onOpenNavigation={handleOpenNavigation}
+        onNavigate={handleNavigate}
+        isExpanded={isBottomSheetExpanded}
+        onToggleExpand={setIsBottomSheetExpanded}
+        isRouting={isRouting}
+        userLocation={userLocation}
+      />
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="absolute inset-0 z-[2000] flex">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="relative w-72 max-w-[85%] h-full ml-auto glass-card animate-slide-in">
+            {/* Menu Header with User Profile */}
+            <div className="p-4 border-b border-[#00d4ff]/10">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold text-white">Menu</h2>
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-8 h-8 rounded-lg bg-[#162d4d] flex items-center justify-center text-slate-400"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {/* User Profile Section */}
+              {user ? (
+                <div className="flex items-center gap-3 p-2 rounded-xl bg-[#162d4d]">
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName}
+                    className="w-9 h-9 rounded-full border-2 border-[#00d4ff]/40"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white font-medium truncate">{user.displayName}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    requireAuth();
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-gradient-to-r from-[#00d4ff]/10 to-[#00ff88]/10 border border-[#00d4ff]/20 text-left text-white flex items-center gap-3 active:scale-[0.98] transition-transform text-sm"
+                >
+                  <div className="w-9 h-9 rounded-full bg-[#162d4d] flex items-center justify-center">
+                    <svg className="w-5 h-5 text-[#00d4ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <span className="text-slate-300">Sign in with Google</span>
+                </button>
+              )}
+            </div>
+            <div className="p-4 space-y-2">
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleOpenNavigation();
+                }}
+                className="w-full p-3 rounded-xl bg-gradient-to-r from-[#00d4ff]/20 to-[#00ff88]/20 border border-[#00d4ff]/30 text-left text-white flex items-center gap-3 active:scale-[0.98] transition-transform text-sm"
+              >
+                <svg className="w-5 h-5 text-[#00d4ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                Navigate
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setShowReportPanel(true);
+                }}
+                className="w-full p-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-red-500/20 border border-amber-500/30 text-left text-white flex items-center gap-3 active:scale-[0.98] transition-transform text-sm"
+              >
+                <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Report Flood
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setShowSettings(true);
+                }}
+                className="w-full p-3 rounded-xl bg-[#162d4d] text-left text-white flex items-center gap-3 active:scale-[0.98] transition-transform text-sm"
+              >
+                <svg className="w-5 h-5 text-[#00d4ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Settings
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setShowAbout(true);
+                }}
+                className="w-full p-3 rounded-xl bg-[#162d4d] text-left text-white flex items-center gap-3 active:scale-[0.98] transition-transform text-sm"
+              >
+                <svg className="w-5 h-5 text-[#00d4ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                About sanBaha
+              </button>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#00d4ff]/10">
+              {user ? (
+                <button
+                  onClick={() => { setIsMobileMenuOpen(false); logout(); }}
+                  className="w-full py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium active:scale-[0.98] transition-transform"
+                >
+                  Sign Out
+                </button>
+              ) : (
+                <p className="text-xs text-center text-slate-500">
+                  sanBaha v1.0.0
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="absolute inset-0 z-[2001] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowSettings(false)} />
+          <div className="relative glass-card rounded-2xl w-full max-w-sm overflow-hidden animate-slide-in">
+            <div className="p-4 border-b border-[#00d4ff]/10 flex items-center justify-between">
+              <h2 className="font-bold text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#00d4ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Settings
+              </h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="w-8 h-8 rounded-lg bg-[#162d4d] flex items-center justify-center text-slate-400"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#162d4d]">
+                <div>
+                  <p className="text-sm text-white">Historical Flood Zones (5-Year)</p>
+                  <p className="text-[10px] text-slate-400">Display UP NOAH historical data</p>
+                </div>
+                <div 
+                  className={`w-10 h-6 rounded-full relative cursor-pointer transition-colors ${showHistoricalData ? 'bg-[#00d4ff]/30' : 'bg-slate-700'}`}
+                  onClick={() => setShowHistoricalData(!showHistoricalData)}
+                >
+                  <div className={`absolute top-0.5 w-5 h-5 rounded-full transition-transform ${showHistoricalData ? 'right-0.5 bg-[#00d4ff]' : 'left-0.5 bg-slate-500'}`} />
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#162d4d]">
+                <div>
+                  <p className="text-sm text-white">Show Flood Zones</p>
+                  <p className="text-[10px] text-slate-400">Display flood risk areas on map</p>
+                </div>
+                <div className="w-10 h-6 bg-[#00d4ff]/30 rounded-full relative cursor-pointer">
+                  <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-[#00d4ff] rounded-full" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#162d4d]">
+                <div>
+                  <p className="text-sm text-white">Sound Alerts</p>
+                  <p className="text-[10px] text-slate-400">Play sound for flood warnings</p>
+                </div>
+                <div className="w-10 h-6 bg-slate-700 rounded-full relative cursor-pointer">
+                  <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-slate-500 rounded-full" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#162d4d]">
+                <div>
+                  <p className="text-sm text-white">Auto-refresh Data</p>
+                  <p className="text-[10px] text-slate-400">Update flood data every 5 minutes</p>
+                </div>
+                <div className="w-10 h-6 bg-[#00d4ff]/30 rounded-full relative cursor-pointer">
+                  <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-[#00d4ff] rounded-full" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* About Modal */}
+      {showAbout && (
+        <div className="absolute inset-0 z-[2001] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowAbout(false)} />
+          <div className="relative glass-card rounded-2xl w-full max-w-sm overflow-hidden animate-slide-in">
+            <div className="p-4 border-b border-[#00d4ff]/10 flex items-center justify-between">
+              <h2 className="font-bold text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#00d4ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                About sanBaha
+              </h2>
+              <button
+                onClick={() => setShowAbout(false)}
+                className="w-8 h-8 rounded-lg bg-[#162d4d] flex items-center justify-center text-slate-400"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="text-center py-4">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#00d4ff] to-[#00ff88] flex items-center justify-center mb-3">
+                  <svg className="w-8 h-8 text-[#0a1628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-white">sanBaha</h3>
+                <p className="text-[#00d4ff] text-sm">Flood-Safe Navigation</p>
+              </div>
+              <div className="space-y-2 text-center">
+                <p className="text-xs text-slate-400">
+                  Navigate safely through Lipa City with real-time flood monitoring and smart routing that avoids flooded areas.
+                </p>
+                <p className="text-xs text-slate-500">
+                  Version 1.0.0 • Made with 💙 for Lipa City
+                </p>
+              </div>
+              <div className="pt-2 border-t border-[#00d4ff]/10">
+                <p className="text-[10px] text-slate-500 text-center">
+                  © 2024 sanBaha Team. All rights reserved.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Login Prompt Modal */}
+      <LoginPrompt />
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+export default App;

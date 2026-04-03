@@ -1,0 +1,70 @@
+/* Mapbox popup customization */
+.mapboxgl-popup-content {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 12px !important;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: #0f2035 !important;
+}
+
+.mapboxgl-popup-close-button {
+  display: none !important;
+}
+
+/* Mapbox controls styling */
+.mapboxgl-ctrl-group {
+  background: rgba(15, 32, 53, 0.95) !important;
+  border: 1px solid rgba(0, 212, 255, 0.2) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.mapboxgl-ctrl-group button {
+  background: transparent !important;
+  border: none !important;
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.mapboxgl-ctrl-group button+button {
+  border-top: 1px solid rgba(0, 212, 255, 0.1) !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background: rgba(22, 45, 77, 0.95) !important;
+}
+
+.mapboxgl-ctrl-icon {
+  filter: invert(1) sepia(1) saturate(5) hue-rotate(150deg);
+}
+
+/* Mapbox attribution */
+.mapboxgl-ctrl-attrib {
+  background: rgba(10, 22, 40, 0.8) !important;
+  color: #64748b !important;
+  font-size: 10px !important;
+  padding: 2px 8px !important;
+  border-radius: 4px !important;
+}
+
+.mapboxgl-ctrl-attrib a {
+  color: #00d4ff !important;
+}
+
+/* Hide Mapbox logo for cleaner look */
+.mapboxgl-ctrl-logo {
+  display: none !important;
+}
+
+/* Ping animation for flood markers */
+@keyframes ping {
+
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}

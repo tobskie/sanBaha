@@ -1,0 +1,42 @@
+mutation SeedDatabase @transaction @auth(level: USER, insecureReason: "This mutation is for internal data seeding and requires user authentication.") {
+  movie_insertMany(data: [
+    {
+      id: "movie-uuid-1",
+      title: "The Galactic Explorer",
+      releaseYear: 2022,
+      genre: "Sci-Fi",
+      rating: 8.5,
+      description: "A thrilling adventure across distant galaxies.",
+      imageUrl: "https://example.com/galactic-explorer.jpg",
+      tags: ["adventure", "space", "future"]
+    },
+    {
+      id: "movie-uuid-2",
+      title: "Whispers of the Forest",
+      releaseYear: 2023,
+      genre: "Fantasy",
+      rating: 7.9,
+      description: "An enchanting tale of magic and ancient woods.",
+      imageUrl: "https://example.com/whispers-forest.jpg",
+      tags: ["magic", "nature", "myth"]
+    }
+  ])
+  product_insertMany(data: [
+    {
+      id: "product-uuid-a",
+      name: "Smart Watch Pro",
+      description: "Advanced smart watch with health tracking.",
+      price: 299.99,
+      category: "Electronics",
+      stock: 150
+    },
+    {
+      id: "product-uuid-b",
+      name: "Ergonomic Office Chair",
+      description: "Comfortable and supportive chair for long working hours.",
+      price: 450.00,
+      category: "Home & Office",
+      stock: 80
+    }
+  ])
+}

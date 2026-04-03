@@ -1,0 +1,311 @@
+import { useState, useRef } from 'react';
+import SensorCard from './SensorCard';
+import DestinationSearch from './DestinationSearch';
+
+const BottomSheet = ({
+    hotspots,
+    selectedHotspot,
+    onHotspotSelect,
+    onSelectDestination,
+    onOpenNavigation,
+    onNavigate,
+    isExpanded,
+    onToggleExpand,
+    isRouting,
+    userLocation
+}) => {
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [activeTab, setActiveTab] = useState('sensors');
+    const sheetRef = useRef(null);
+    const [startY, setStartY] = useState(0);
+    const [currentY, setCurrentY] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+
+    // Filter hotspots
+    const filteredHotspots = hotspots.filter(hotspot =>
+        filterStatus === 'all' || hotspot.status === filterStatus
+    );
+
+    // Status counts
+    const statusCounts = {
+        all: hotspots.length,
+        clear: hotspots.filter(h => h.status === 'clear').length,
+        warning: hotspots.filter(h => h.status === 'warning').length,
+        flooded: hotspots.filter(h => h.status === 'flooded').length,
+    };
+
+    // Check for flooded routes
+    const hasFloodedRoute = hotspots.some(h => h.status === 'flooded');
+
+    // Touch handlers for swipe gesture
+    const handleTouchStart = (e) => {
+        setStartY(e.touches[0].clientY);
+        setIsDragging(true);
+    };
+
+    const handleTouchMove = (e) => {
+        if (!isDragging) return;
+        setCurrentY(e.touches[0].clientY);
+    };
+
+    const handleTouchEnd = () => {
+        if (!isDragging) return;
+        const diff = currentY - startY;
+
+        if (Math.abs(diff) > 50) {
+            if (diff > 0 && isExpanded) {
+                onToggleExpand(false);
+            } else if (diff < 0 && !isExpanded) {
+                onToggleExpand(true);
+            }
+        }
+
+        setIsDragging(false);
+        setStartY(0);
+        setCurrentY(0);
+    };
+
+
+    return (
+        <div
+            ref={sheetRef}
+            className={`
+        absolute left-0 right-0 bottom-0 z-[1001]
+        glass rounded-t-3xl shadow-2xl
+        transition-all duration-300 ease-out
+        ${isExpanded ? 'h-[70%]' : 'h-[260px]'}
+      `}
+        >
+            {/* Drag Handle */}
+            <div
+                className="flex justify-center py-2.5 cursor-grab active:cursor-grabbing"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onClick={() => onToggleExpand(!isExpanded)}
+            >
+                <div className="w-10 h-1 bg-slate-500 rounded-full" />
+            </div>
+
+            {/* Header Section */}
+            <div className="px-3 pb-2">
+                {/* Enhanced Destination Search */}
+                <div className="mb-2">
+                    <DestinationSearch
+                        onSelectDestination={onSelectDestination}
+                        onOpenNavigation={onOpenNavigation}
+                        isRouting={isRouting}
+                        userLocation={userLocation}
+                    />
+                </div>
+
+                {/* Alternative Route Alert */}
+                {hasFloodedRoute && (
+                    <div className="mb-2 p-2.5 bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-xs font-medium text-amber-300">Flood areas detected</p>
+                            <p className="text-[10px] text-amber-200/70">Routes will avoid flooded zones</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Tab Navigation */}
+                <div className="flex gap-1.5 p-1 bg-[#0a1628] rounded-xl">
+                    <button
+                        onClick={() => setActiveTab('sensors')}
+                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'sensors'
+                                ? 'bg-[#162d4d] text-[#00d4ff]'
+                                : 'text-slate-400'
+                            }`}
+                    >
+                        <span className="flex items-center justify-center gap-1.5">
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                            </svg>
+                            Sensors
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('alerts')}
+                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all relative ${activeTab === 'alerts'
+                                ? 'bg-[#162d4d] text-[#00d4ff]'
+                                : 'text-slate-400'
+                            }`}
+                    >
+                        <span className="flex items-center justify-center gap-1.5">
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                            </svg>
+                            Alerts
+                        </span>
+                        {statusCounts.flooded > 0 && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
+                                {statusCounts.flooded}
+                            </span>
+                        )}
+                    </button>
+                </div>
+            </div>
+
+            {/* Content Area */}
+            {isExpanded && (
+                <div className="px-3 pb-3 overflow-hidden">
+                    {activeTab === 'sensors' && (
+                        <>
+                            {/* Status Filter Pills */}
+                            <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1 -mx-1 px-1 hide-scrollbar">
+                                {[
+                                    { key: 'all', label: 'All', color: 'bg-slate-500/20 text-slate-300', active: 'bg-[#00d4ff]/20 text-[#00d4ff]' },
+                                    { key: 'clear', label: 'Clear', color: 'bg-emerald-500/20 text-emerald-400', active: 'bg-emerald-500/30 text-emerald-300' },
+                                    { key: 'warning', label: 'Warning', color: 'bg-amber-500/20 text-amber-400', active: 'bg-amber-500/30 text-amber-300' },
+                                    { key: 'flooded', label: 'Flooded', color: 'bg-red-500/20 text-red-400', active: 'bg-red-500/30 text-red-300' },
+                                ].map((filter) => (
+                                    <button
+                                        key={filter.key}
+                                        onClick={() => setFilterStatus(filter.key)}
+                                        className={`
+                      flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all
+                      ${filterStatus === filter.key ? filter.active : filter.color}
+                    `}
+                                    >
+                                        {filter.label} ({statusCounts[filter.key]})
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Sensor Cards List */}
+                            <div className="overflow-y-auto max-h-[calc(70vh-220px)] space-y-2 pr-1">
+                                {filteredHotspots.map((hotspot) => (
+                                    <div
+                                        key={hotspot.id}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <div className="flex-1">
+                                            <SensorCard
+                                                sensor={hotspot}
+                                                isSelected={selectedHotspot?.id === hotspot.id}
+                                                onClick={() => {
+                                                    onHotspotSelect(hotspot);
+                                                    onToggleExpand(false);
+                                                }}
+                                            />
+                                        </div>
+                                        {/* Navigate button */}
+                                        <button
+                                            onClick={() => {
+                                                onNavigate(hotspot);
+                                                onToggleExpand(false);
+                                            }}
+                                            disabled={isRouting}
+                                            className="w-10 h-10 rounded-xl bg-gradient-to-r from-[#00d4ff] to-[#00ff88] flex items-center justify-center text-[#0a1628] active:scale-95 disabled:opacity-50 flex-shrink-0"
+                                            title="Navigate here"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+
+                    {activeTab === 'alerts' && (
+                        <div className="space-y-2 overflow-y-auto max-h-[calc(70vh-180px)]">
+                            {hotspots.filter(h => h.status === 'flooded').length > 0 ? (
+                                hotspots.filter(h => h.status === 'flooded').map((hotspot) => (
+                                    <div
+                                        key={hotspot.id}
+                                        onClick={() => {
+                                            onHotspotSelect(hotspot);
+                                            onToggleExpand(false);
+                                        }}
+                                        className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-3 active:scale-[0.98] transition-transform"
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center animate-pulse">
+                                            <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h4 className="font-semibold text-red-300 text-sm">{hotspot.name}</h4>
+                                            <p className="text-xs text-red-200/70">{hotspot.waterLevel} cm • Not Passable</p>
+                                        </div>
+                                        <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-8">
+                                    <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                        <svg className="w-7 h-7 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <h4 className="font-semibold text-emerald-300 text-sm mb-1">All Clear!</h4>
+                                    <p className="text-xs text-slate-400">No flood alerts</p>
+                                </div>
+                            )}
+
+                            {/* Warning alerts */}
+                            {hotspots.filter(h => h.status === 'warning').map((hotspot) => (
+                                <div
+                                    key={hotspot.id}
+                                    onClick={() => {
+                                        onHotspotSelect(hotspot);
+                                        onToggleExpand(false);
+                                    }}
+                                    className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3 active:scale-[0.98] transition-transform"
+                                >
+                                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold text-amber-300 text-sm">{hotspot.name}</h4>
+                                        <p className="text-xs text-amber-200/70">{hotspot.waterLevel} cm • Caution</p>
+                                    </div>
+                                    <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Collapsed Quick Stats */}
+            {!isExpanded && (
+                <div className="px-3">
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                            <p className="text-xl font-bold text-emerald-400">{statusCounts.clear}</p>
+                            <p className="text-[10px] text-emerald-300/70">Passable</p>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+                            <p className="text-xl font-bold text-amber-400">{statusCounts.warning}</p>
+                            <p className="text-[10px] text-amber-300/70">Caution</p>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-center relative">
+                            <p className="text-xl font-bold text-red-400">{statusCounts.flooded}</p>
+                            <p className="text-[10px] text-red-300/70">Flooded</p>
+                            {statusCounts.flooded > 0 && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default BottomSheet;

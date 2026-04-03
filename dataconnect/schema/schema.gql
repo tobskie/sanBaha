@@ -1,0 +1,56 @@
+type User @table {
+  displayName: String!
+  createdAt: Timestamp!
+  email: String
+  photoUrl: String
+  homeLocation: Vector @col(size: 2)
+  workLocation: Vector @col(size: 2)
+}
+
+type FloodSensor @table {
+  sensorId: String!
+  location: Vector @col(size: 2)
+  installationDate: Timestamp!
+  lastCalibrationDate: Timestamp
+  sensorType: String
+  status: String
+}
+
+type SensorReading @table {
+  timestamp: Timestamp!
+  waterLevel: Float!
+  sensor: FloodSensor
+  batteryStatus: Int
+  temperature: Float
+}
+
+type Route @table {
+  user: User
+  startLocation: Vector @col(size: 2)
+  endLocation: Vector @col(size: 2)
+  createdAt: Timestamp!
+  routeName: String
+  isSafe: Boolean
+  estimatedTravelTime: Int
+  currentStatus: String
+}
+
+type FloodZone @table {
+  zoneName: String!
+  polygonCoordinates: Vector @col(size: 2)
+  severity: String!
+  lastUpdated: Timestamp!
+  description: String
+  cause: String
+  forecast: String
+}
+
+type UserReport @table {
+  user: User
+  reportLocation: Vector @col(size: 2)
+  reportType: String!
+  createdAt: Timestamp!
+  description: String
+  photoUrl: String
+  status: String
+}
