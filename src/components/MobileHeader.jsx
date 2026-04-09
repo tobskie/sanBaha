@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import sanBahaLogo from '../img/sanBaha-logo.png';
 
-const MobileHeader = ({ lastUpdate, onMenuClick, onNavigateClick }) => {
+const MobileHeader = ({ lastUpdate, onMenuClick, onNavigateClick, isAdmin = false, pendingReviewCount = 0 }) => {
     const [isOnline, setIsOnline] = useState(true);
 
     useEffect(() => {
@@ -60,14 +60,21 @@ const MobileHeader = ({ lastUpdate, onMenuClick, onNavigateClick }) => {
                         </button>
 
                         {/* Menu Button */}
-                        <button
-                            onClick={onMenuClick}
-                            className="w-9 h-9 rounded-xl bg-[#162d4d] flex items-center justify-center text-slate-300 active:scale-95 transition-transform"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={onMenuClick}
+                                className="w-9 h-9 rounded-xl bg-[#162d4d] flex items-center justify-center text-slate-300 active:scale-95 transition-transform"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                                {isAdmin && pendingReviewCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-bold leading-none">
+                                        {pendingReviewCount > 9 ? '9+' : pendingReviewCount}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

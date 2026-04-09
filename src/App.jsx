@@ -14,6 +14,7 @@ import { subscribeToFloodData, submitFloodReport } from './services/firebase';
 import { useAuth } from './contexts/AuthContext';
 import { useAdmin } from './contexts/AdminContext';
 import { useUploadQueue } from './hooks/useUploadQueue';
+import { useReviewQueue } from './hooks/useReviewQueue';
 import { ref as fRef, set as fSet } from 'firebase/database';
 import { database as db } from './services/firebase';
 import Toast from './components/Toast';
@@ -22,6 +23,7 @@ function App() {
   const { user, requireAuth, logout } = useAuth();
   const { isAdmin } = useAdmin();
   const { enqueue: enqueueUpload } = useUploadQueue();
+  const pendingReviewCount = useReviewQueue();
   const [toast, setToast] = useState(null);
   const [hotspots, setHotspots] = useState([]);
   const [selectedHotspot, setSelectedHotspot] = useState(null);
@@ -350,6 +352,8 @@ function App() {
         lastUpdate={lastUpdate}
         onMenuClick={() => setIsMobileMenuOpen(true)}
         onNavigateClick={handleOpenNavigation}
+        isAdmin={isAdmin}
+        pendingReviewCount={pendingReviewCount}
       />
 
       {/* Map Container */}
