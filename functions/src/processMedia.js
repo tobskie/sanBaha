@@ -55,8 +55,8 @@ async function processImage(bucket, filePath, reportId, db) {
     processingStatus: 'complete',
   });
 
-  fs.unlinkSync(tmpInput);
-  fs.unlinkSync(tmpThumb);
+  if (fs.existsSync(tmpInput)) fs.unlinkSync(tmpInput);
+  if (fs.existsSync(tmpThumb)) fs.unlinkSync(tmpThumb);
 }
 
 async function processVideo(bucket, filePath, reportId, db) {
