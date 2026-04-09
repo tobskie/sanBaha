@@ -422,70 +422,52 @@ function App() {
         isRefreshing={isRefreshing}
       />
 
-      {/* Route Summary Card */}
+      {/* Route Summary Card — compact top strip */}
       {routeData?.safeRoute && !showNavigationPanel && (
-        <div className="absolute left-3 right-3 bottom-[290px] z-[1001]">
-          <div className={`glass rounded-2xl p-3 shadow-xl border ${routeData.safeRoute.isFlooded
-            ? 'border-red-500/30'
-            : 'border-emerald-500/30'
-            }`}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                {routeData.safeRoute.isFlooded ? (
-                  <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-                <div>
-                  <h3 className="font-bold text-white text-sm">{destination || 'Route'}</h3>
-                  <p className={`text-[10px] ${routeData.safeRoute.isFlooded ? 'text-red-300' : 'text-emerald-300'
-                    }`}>
-                    {routeData.safeRoute.isFlooded ? 'Flood on route!' : 'Safe route'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleClearRoute}
-                className="w-7 h-7 rounded-lg bg-[#162d4d] flex items-center justify-center text-slate-400 active:scale-95"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Route Stats */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-2 bg-[#0a1628] rounded-lg text-center">
-                <p className="text-lg font-bold text-[#00d4ff]">
-                  {formatDuration(routeData.safeRoute.duration)}
-                </p>
-                <p className="text-[9px] text-slate-400">duration</p>
-              </div>
-              <div className="p-2 bg-[#0a1628] rounded-lg text-center">
-                <p className="text-lg font-bold text-[#00d4ff]">
-                  {formatDistance(routeData.safeRoute.distance)}
-                </p>
-                <p className="text-[9px] text-slate-400">distance</p>
-              </div>
-            </div>
-
-            {/* Warning for flooded routes */}
-            {routeData.safeRoute.isFlooded && routeData.warnings?.length > 0 && (
-              <div className="mt-2 p-2 bg-red-500/10 rounded-lg">
-                <p className="text-[10px] text-red-300">
-                  ⚠️ Route crosses: {routeData.warnings.map(w => w.name).join(', ')}
-                </p>
-              </div>
+        <div className="absolute left-0 right-0 top-[56px] z-[1001]">
+          <div className={`flex items-center gap-2 px-3 py-2 border-b backdrop-blur-md ${
+            routeData.unavoidable
+              ? 'bg-amber-900/80 border-amber-500/30'
+              : routeData.safeRoute.isFlooded
+                ? 'bg-red-900/80 border-red-500/30'
+                : 'bg-[#0a1628]/90 border-emerald-500/20'
+          }`}>
+            {/* Status dot */}
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              routeData.unavoidable
+                ? 'bg-amber-400'
+                : routeData.safeRoute.isFlooded
+                  ? 'bg-red-400'
+                  : 'bg-emerald-400'
+            }`} />
+            {/* Destination */}
+            <span className="text-white text-xs font-semibold truncate flex-1">
+              {destination || 'Route'}
+            </span>
+            {/* ETA */}
+            <span className="text-[#00d4ff] text-xs font-bold flex-shrink-0">
+              {formatDuration(routeData.safeRoute.duration)}
+            </span>
+            <span className="text-slate-500 text-xs flex-shrink-0">·</span>
+            {/* Distance */}
+            <span className="text-slate-300 text-xs flex-shrink-0">
+              {formatDistance(routeData.safeRoute.distance)}
+            </span>
+            {/* Flood warning pill */}
+            {(routeData.safeRoute.isFlooded || routeData.unavoidable) && routeData.warnings?.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[9px] font-semibold flex-shrink-0">
+                ⚠ {routeData.warnings.map(w => w.name).join(', ')}
+              </span>
             )}
+            {/* Close */}
+            <button
+              onClick={handleClearRoute}
+              className="w-6 h-6 rounded-lg bg-[#162d4d] flex items-center justify-center text-slate-400 active:scale-95 flex-shrink-0"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
