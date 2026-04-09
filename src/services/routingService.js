@@ -207,16 +207,22 @@ export function checkRouteIntersection(route, floodZones) {
     };
 }
 
-const BYPASS_DISTANCE_KM = 0.3; // 2× FLOOD_BUFFER_RADIUS
+const BYPASS_DISTANCE_KM = 0.45; // 3× FLOOD_BUFFER_RADIUS — clears adjacent parallel streets
 
 /**
- * Compute bypass waypoints that steer around intersected flood zones.
- * For each crossed zone, places a waypoint 300m perpendicular from the
- * flood center. Tries right side first; falls back to left side if that
- * candidate itself sits inside a flood zone.
- * @param {Object} safeRoute - route object with .geometry (GeoJSON LineString)
+ * Compute bracket bypass waypoints around flood zones.
+ * Places two waypoints per crossed zone — one at the route entry point into
+ * the zone, one at the exit point — both offset 450m perpendicular to the
+ * route direction. This forces Mapbox to route around the zone rather than
+ * snapping the waypoint back to the flooded road.
+ *
+ * Falls back to single centroid waypoint if lineIntersect returns < 2 points
+ * (e.g. route endpoint is inside the zone). When > 2 points are returned
+ * (route re-enters the zone), only the outermost entry and exit are used.
+ *
+ * @param {Object} safeRoute - route object with .geometry (raw GeoJSON LineString geometry, not a Feature)
  * @param {Object} floodZones - GeoJSON FeatureCollection of flood zone polygons
- * @returns {Array} Array of [lon, lat] waypoint coordinates
+ * @returns {Array} Array of [lon, lat] waypoint coordinates in route-progress order
  */
 export function computeBypassWaypoints(safeRoute, floodZones) {
     if (!floodZones.features.length) return [];
@@ -227,24 +233,59 @@ export function computeBypassWaypoints(safeRoute, floodZones) {
     for (const zone of floodZones.features) {
         if (!turf.booleanIntersects(routeLine, zone)) continue;
 
-        const floodCenter = turf.centroid(zone);
-        const nearestPt = turf.nearestPointOnLine(routeLine, floodCenter);
-        const bearing = turf.bearing(floodCenter, nearestPt);
+        // Find exact entry and exit points on the zone boundary
+        const intersections = turf.lineIntersect(routeLine, zone);
 
-        // Try right-perpendicular first
-        const rightBearing = (bearing + 90 + 360) % 360;
-        let candidate = turf.destination(floodCenter, BYPASS_DISTANCE_KM, rightBearing, { units: 'kilometers' });
-
-        // If right candidate is inside any flood zone, try left
-        const candidateInFlood = floodZones.features.some(z =>
-            turf.booleanPointInPolygon(candidate, z)
-        );
-        if (candidateInFlood) {
-            const leftBearing = (bearing - 90 + 360) % 360;
-            candidate = turf.destination(floodCenter, BYPASS_DISTANCE_KM, leftBearing, { units: 'kilometers' });
+        if (intersections.features.length < 2) {
+            // Fallback: single centroid offset (original behavior)
+            const floodCenter = turf.centroid(zone);
+            const nearestPt = turf.nearestPointOnLine(routeLine, floodCenter);
+            const bearing = turf.bearing(floodCenter, nearestPt);
+            const rightBearing = (bearing + 90 + 360) % 360;
+            let candidate = turf.destination(floodCenter, BYPASS_DISTANCE_KM, rightBearing, { units: 'kilometers' });
+            const candidateInFlood = floodZones.features.some(z => turf.booleanPointInPolygon(candidate, z));
+            if (candidateInFlood) {
+                const leftBearing = (bearing - 90 + 360) % 360;
+                candidate = turf.destination(floodCenter, BYPASS_DISTANCE_KM, leftBearing, { units: 'kilometers' });
+            }
+            waypoints.push(candidate.geometry.coordinates);
+            continue;
         }
 
-        waypoints.push(candidate.geometry.coordinates);
+        // Sort intersection points by their distance along the route
+        const ordered = intersections.features
+            .map(f => {
+                const onLine = turf.nearestPointOnLine(routeLine, f);
+                return { coords: f.geometry.coordinates, location: onLine.properties.location };
+            })
+            .sort((a, b) => a.location - b.location);
+
+        // Use first (entry) and last (exit) points to bracket the full flooded segment.
+        // If the route re-crosses the zone (> 2 intersections), intermediate points are
+        // skipped; the outermost bracket forces Mapbox around the entire flooded stretch.
+        const entryPt = ordered[0].coords;
+        const exitPt = ordered[ordered.length - 1].coords;
+
+        // Perpendicular bearing based on entry→exit segment direction
+        const segBearing = turf.bearing(turf.point(entryPt), turf.point(exitPt));
+        const rightPerp = (segBearing + 90 + 360) % 360;
+        const leftPerp = (segBearing - 90 + 360) % 360;
+
+        // Place entry and exit waypoints on the same side (right first)
+        let entryCandidate = turf.destination(turf.point(entryPt), BYPASS_DISTANCE_KM, rightPerp, { units: 'kilometers' });
+        let exitCandidate = turf.destination(turf.point(exitPt), BYPASS_DISTANCE_KM, rightPerp, { units: 'kilometers' });
+
+        // If either candidate lands inside a flood zone, flip both to left side
+        const eitherInFlood = floodZones.features.some(z =>
+            turf.booleanPointInPolygon(entryCandidate, z) || turf.booleanPointInPolygon(exitCandidate, z)
+        );
+        if (eitherInFlood) {
+            entryCandidate = turf.destination(turf.point(entryPt), BYPASS_DISTANCE_KM, leftPerp, { units: 'kilometers' });
+            exitCandidate = turf.destination(turf.point(exitPt), BYPASS_DISTANCE_KM, leftPerp, { units: 'kilometers' });
+        }
+
+        waypoints.push(entryCandidate.geometry.coordinates);
+        waypoints.push(exitCandidate.geometry.coordinates);
     }
 
     return waypoints;
