@@ -18,6 +18,7 @@ import { useReviewQueue } from './hooks/useReviewQueue';
 import { ref as fRef, set as fSet } from 'firebase/database';
 import { database as db } from './services/firebase';
 import Toast from './components/Toast';
+import ReviewQueuePanel from './components/ReviewQueuePanel';
 
 function App() {
   const { user, requireAuth, logout } = useAuth();
@@ -47,6 +48,7 @@ function App() {
   // Crowdsourcing state
   const [crowdsourcedReports, setCrowdsourcedReports] = useState([]);
   const [showReportPanel, setShowReportPanel] = useState(false);
+  const [showReviewQueue, setShowReviewQueue] = useState(false);
 
   // UI state
   const [showSettings, setShowSettings] = useState(false);
@@ -555,6 +557,25 @@ function App() {
               )}
             </div>
             <div className="p-4 space-y-2">
+              {isAdmin && pendingReviewCount > 0 && (
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setShowReviewQueue(true);
+                  }}
+                  className="w-full p-3 rounded-xl bg-gradient-to-r from-red-500/20 to-amber-500/20 border border-red-500/30 text-left text-white flex items-center justify-between active:scale-[0.98] transition-transform text-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    Review Queue
+                  </div>
+                  <span className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-[9px] text-white font-bold">
+                    {pendingReviewCount > 9 ? '9+' : pendingReviewCount}
+                  </span>
+                </button>
+              )}
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
@@ -762,6 +783,9 @@ function App() {
 
       {/* Login Prompt Modal */}
       <LoginPrompt />
+
+      {/* Review Queue Panel */}
+      <ReviewQueuePanel isOpen={showReviewQueue} onClose={() => setShowReviewQueue(false)} />
 
       {/* Hazard Map Panel */}
       <HazardMapPanel 
