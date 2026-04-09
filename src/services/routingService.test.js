@@ -32,18 +32,16 @@ afterEach(() => { vi.restoreAllMocks(); });
 describe('getDirections', () => {
   it('builds URL with only origin and destination when no waypoints', async () => {
     const { getDirections } = await import('./routingService.js');
-    await getDirections([121.1, 13.9], [121.2, 14.0]);
+    await getDirections([121.1, 13.9], [121.2, 14.1]);
     const url = fetchSpy.mock.calls[0][0];
-    // Note: JS number-to-string drops trailing zeros, so 14.0 → "14"
-    expect(url).toContain('121.1,13.9;121.2,14');
+    expect(url).toContain('121.1,13.9;121.2,14.1');
     expect(url).not.toContain('undefined');
   });
 
   it('inserts waypoints between origin and destination in the URL', async () => {
     const { getDirections } = await import('./routingService.js');
-    await getDirections([121.1, 13.9], [121.2, 14.0], true, [[121.15, 13.95]]);
+    await getDirections([121.1, 13.9], [121.2, 14.1], true, [[121.15, 13.95]]);
     const url = fetchSpy.mock.calls[0][0];
-    // Note: JS number-to-string drops trailing zeros, so 14.0 → "14"
-    expect(url).toContain('121.1,13.9;121.15,13.95;121.2,14');
+    expect(url).toContain('121.1,13.9;121.15,13.95;121.2,14.1');
   });
 });

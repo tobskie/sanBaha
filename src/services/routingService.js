@@ -141,6 +141,7 @@ export async function reverseGeocode(coords) {
  * @param {Array} origin - [longitude, latitude]
  * @param {Array} destination - [longitude, latitude]
  * @param {boolean} alternatives - Request alternative routes
+ * @param {Array} [waypoints=[]] - Optional intermediate waypoints as [[lon, lat], ...]
  * @returns {Promise<Object>} Route data
  */
 export async function getDirections(origin, destination, alternatives = true, waypoints = []) {
