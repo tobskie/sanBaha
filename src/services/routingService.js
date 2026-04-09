@@ -143,9 +143,9 @@ export async function reverseGeocode(coords) {
  * @param {boolean} alternatives - Request alternative routes
  * @returns {Promise<Object>} Route data
  */
-export async function getDirections(origin, destination, alternatives = true) {
-    // Use driving-traffic profile for Waze/Google Maps real-time accuracy based on traffic conditions
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?alternatives=${alternatives}&geometries=geojson&overview=full&steps=true&access_token=${MAPBOX_TOKEN}`;
+export async function getDirections(origin, destination, alternatives = true, waypoints = []) {
+    const coords = [origin, ...waypoints, destination].map(c => `${c[0]},${c[1]}`).join(';');
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coords}?alternatives=${alternatives}&geometries=geojson&overview=full&steps=true&access_token=${MAPBOX_TOKEN}`;
 
     try {
         const response = await fetch(url);
