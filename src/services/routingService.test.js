@@ -95,3 +95,46 @@ describe('computeBypassWaypoints', () => {
     expect(destSpy).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('getSmartRouteWithAvoidance', () => {
+  it('returns immediately when initial route is dry', async () => {
+    // booleanIntersects stays false (default mock) → no flood
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        routes: [{ geometry: { type: 'LineString', coordinates: [[121.1, 13.9],[121.2,14.1]] }, duration: 600, distance: 5000 }]
+      })
+    });
+    const { getSmartRouteWithAvoidance } = await import('./routingService.js');
+    const result = await getSmartRouteWithAvoidance([121.1, 13.9], [121.2, 14.1], []);
+    expect(result.success).toBe(true);
+    expect(result.safeRoute.isFlooded).toBe(false);
+    // Only one fetch call — no retry
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries with bypass waypoints when initial route is flooded', async () => {
+    turf.booleanIntersects.mockReturnValue(true); // all routes flooded
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        routes: [{ geometry: { type: 'LineString', coordinates: [[121.1, 13.9],[121.2,14.1]] }, duration: 600, distance: 5000 }]
+      })
+    });
+    const { getSmartRouteWithAvoidance } = await import('./routingService.js');
+    const floodPoints = [{ id: '1', name: 'Quiib', status: 'flooded', coordinates: [13.95, 121.15], waterLevel: 1.2 }];
+    const result = await getSmartRouteWithAvoidance([121.1, 13.9], [121.2, 14.1], floodPoints);
+    expect(result.success).toBe(true);
+    // Two fetches: initial + retry
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(result.unavoidable).toBe(true); // still flooded after retry
+  });
+
+  it('returns success:false when Mapbox fetch throws', async () => {
+    fetchSpy.mockRejectedValue(new Error('network error'));
+    const { getSmartRouteWithAvoidance } = await import('./routingService.js');
+    const result = await getSmartRouteWithAvoidance([121.1, 13.9], [121.2, 14.1], []);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('network error');
+  });
+});

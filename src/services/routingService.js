@@ -358,3 +358,43 @@ export async function getSmartRoute(origin, destination, floodPoints) {
         };
     }
 }
+
+/**
+ * Get route with active flood zone avoidance via waypoint injection.
+ * On first call, behaves identically to getSmartRoute. If the best route
+ * is flooded, computes bypass waypoints and retries once.
+ * @param {Array} origin - [longitude, latitude]
+ * @param {Array} destination - [longitude, latitude]
+ * @param {Array} floodPoints - Array of flood hotspot objects
+ * @returns {Promise<Object>} { success, safeRoute, allRoutes, floodZones, warnings, unavoidable, origin, destination }
+ */
+export async function getSmartRouteWithAvoidance(origin, destination, floodPoints) {
+    try {
+        // Step 1: Initial fetch using existing smart route logic
+        const initial = await getSmartRoute(origin, destination, floodPoints);
+        if (!initial.success) return initial;
+        if (!initial.safeRoute.isFlooded) return { ...initial, unavoidable: false };
+
+        // Step 2: Compute bypass waypoints for each crossed flood zone
+        const bypassWaypoints = computeBypassWaypoints(initial.safeRoute, initial.floodZones);
+
+        // Step 3: Retry with waypoints
+        const retryData = await getDirections(origin, destination, true, bypassWaypoints);
+        if (!retryData.routes || retryData.routes.length === 0) {
+            return { ...initial, unavoidable: true };
+        }
+
+        const retryAnalysis = findSafestRoute(retryData.routes, initial.floodZones);
+        return {
+            success: true,
+            ...retryAnalysis,
+            floodZones: initial.floodZones,
+            origin,
+            destination,
+            unavoidable: retryAnalysis.safeRoute.isFlooded,
+        };
+    } catch (error) {
+        console.error('Smart routing error:', error);
+        return { success: false, error: error.message };
+    }
+}
