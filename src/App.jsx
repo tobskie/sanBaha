@@ -11,7 +11,7 @@ import ReportFloodPanel from './components/ReportFloodPanel';
 import HazardMapPanel from './components/HazardMapPanel';
 import LoginPrompt from './components/LoginPrompt';
 import { getStatusFromWaterLevel } from './data/mockData';
-import { getSmartRoute, createFloodZones, formatDuration, formatDistance, checkRouteIntersection } from './services/routingService';
+import { getSmartRouteWithAvoidance, createFloodZones, formatDuration, formatDistance, checkRouteIntersection } from './services/routingService';
 import { subscribeToFloodData, submitFloodReport } from './services/firebase';
 import { useAuth } from './contexts/AuthContext';
 import { useAdmin } from './contexts/AdminContext';
@@ -195,14 +195,19 @@ function App() {
   const handleNavigateWithCoords = async (origin, dest) => {
     setIsRouting(true);
     try {
-      const result = await getSmartRoute(origin, dest, hotspots);
+      const result = await getSmartRouteWithAvoidance(origin, dest, hotspots);
 
       if (result.success) {
         setRouteData(result);
         setShowNavigationPanel(false);
         setSelectedHotspot(null);
         setIsFollowMode(true); // Start following user like Google Maps
-        setToast({ message: 'Route found! Follow blue line.', type: 'info' });
+        setToast({
+          message: result.unavoidable
+            ? 'Only available route crosses a flood zone. Proceed with caution.'
+            : 'Route found! Follow blue line.',
+          type: result.unavoidable ? 'warning' : 'info'
+        });
       } else {
         setToast({ message: 'Could not find a route: ' + result.error, type: 'error' });
       }
