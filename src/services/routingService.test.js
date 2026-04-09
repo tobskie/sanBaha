@@ -17,6 +17,7 @@ vi.mock('@turf/turf', () => ({
 let fetchSpy;
 
 beforeEach(() => {
+  vi.clearAllMocks();
   fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: true,
     json: async () => ({
@@ -43,5 +44,54 @@ describe('getDirections', () => {
     await getDirections([121.1, 13.9], [121.2, 14.1], true, [[121.15, 13.95]]);
     const url = fetchSpy.mock.calls[0][0];
     expect(url).toContain('121.1,13.9;121.15,13.95;121.2,14.1');
+  });
+});
+
+import * as turf from '@turf/turf';
+
+describe('computeBypassWaypoints', () => {
+  it('returns empty array when no flood zones provided', async () => {
+    const { computeBypassWaypoints } = await import('./routingService.js');
+    const routeLine = { geometry: { type: 'LineString', coordinates: [[121.1, 13.9], [121.2, 14.1]] } };
+    const emptyZones = { type: 'FeatureCollection', features: [] };
+    const result = computeBypassWaypoints(routeLine, emptyZones);
+    expect(result).toEqual([]);
+  });
+
+  it('returns one waypoint per intersected flood zone', async () => {
+    turf.booleanIntersects.mockReturnValueOnce(true); // first zone intersects
+    const { computeBypassWaypoints } = await import('./routingService.js');
+    const routeLine = {
+      geometry: { type: 'LineString', coordinates: [[121.1, 13.9], [121.2, 14.1]] }
+    };
+    const floodZones = {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[]] }, properties: { name: 'Quiib' } }
+      ]
+    };
+    const result = computeBypassWaypoints(routeLine, floodZones);
+    expect(result).toHaveLength(1);
+    expect(Array.isArray(result[0])).toBe(true);
+    expect(result[0]).toHaveLength(2); // [lon, lat]
+  });
+
+  it('tries opposite side when first candidate is inside a flood zone', async () => {
+    turf.booleanIntersects.mockReturnValueOnce(true);  // route crosses zone
+    turf.booleanPointInPolygon.mockReturnValueOnce(true); // right-side candidate blocked
+    const destSpy = turf.destination;
+    const { computeBypassWaypoints } = await import('./routingService.js');
+    const routeLine = {
+      geometry: { type: 'LineString', coordinates: [[121.1, 13.9], [121.2, 14.1]] }
+    };
+    const floodZones = {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[]] }, properties: { name: 'Quiib' } }
+      ]
+    };
+    computeBypassWaypoints(routeLine, floodZones);
+    // destination should have been called twice (right then left)
+    expect(destSpy).toHaveBeenCalledTimes(2);
   });
 });

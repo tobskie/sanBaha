@@ -207,6 +207,49 @@ export function checkRouteIntersection(route, floodZones) {
     };
 }
 
+const BYPASS_DISTANCE_KM = 0.3; // 2× FLOOD_BUFFER_RADIUS
+
+/**
+ * Compute bypass waypoints that steer around intersected flood zones.
+ * For each crossed zone, places a waypoint 300m perpendicular from the
+ * flood center. Tries right side first; falls back to left side if that
+ * candidate itself sits inside a flood zone.
+ * @param {Object} safeRoute - route object with .geometry (GeoJSON LineString)
+ * @param {Object} floodZones - GeoJSON FeatureCollection of flood zone polygons
+ * @returns {Array} Array of [lon, lat] waypoint coordinates
+ */
+export function computeBypassWaypoints(safeRoute, floodZones) {
+    if (!floodZones.features.length) return [];
+
+    const routeLine = turf.lineString(safeRoute.geometry.coordinates);
+    const waypoints = [];
+
+    for (const zone of floodZones.features) {
+        if (!turf.booleanIntersects(routeLine, zone)) continue;
+
+        const floodCenter = turf.centroid(zone);
+        const nearestPt = turf.nearestPointOnLine(routeLine, floodCenter);
+        const bearing = turf.bearing(floodCenter, nearestPt);
+
+        // Try right-perpendicular first
+        const rightBearing = (bearing + 90) % 360;
+        let candidate = turf.destination(floodCenter, BYPASS_DISTANCE_KM, rightBearing, { units: 'kilometers' });
+
+        // If right candidate is inside any flood zone, try left
+        const candidateInFlood = floodZones.features.some(z =>
+            turf.booleanPointInPolygon(candidate, z)
+        );
+        if (candidateInFlood) {
+            const leftBearing = (bearing - 90 + 360) % 360;
+            candidate = turf.destination(floodCenter, BYPASS_DISTANCE_KM, leftBearing, { units: 'kilometers' });
+        }
+
+        waypoints.push(candidate.geometry.coordinates);
+    }
+
+    return waypoints;
+}
+
 /**
  * Find the shortest dry path from alternatives
  * Priority: 1. Avoid flooded areas  2. Shortest distance
