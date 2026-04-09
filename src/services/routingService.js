@@ -232,7 +232,7 @@ export function computeBypassWaypoints(safeRoute, floodZones) {
         const bearing = turf.bearing(floodCenter, nearestPt);
 
         // Try right-perpendicular first
-        const rightBearing = (bearing + 90) % 360;
+        const rightBearing = (bearing + 90 + 360) % 360;
         let candidate = turf.destination(floodCenter, BYPASS_DISTANCE_KM, rightBearing, { units: 'kilometers' });
 
         // If right candidate is inside any flood zone, try left
