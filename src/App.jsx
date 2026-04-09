@@ -6,17 +6,24 @@ import FloatingActions from './components/FloatingActions';
 import HotspotDetail from './components/HotspotDetail';
 import NavigationPanel from './components/NavigationPanel';
 import ReportFloodPanel from './components/ReportFloodPanel';
+import HazardMapPanel from './components/HazardMapPanel';
 import LoginPrompt from './components/LoginPrompt';
-import { floodHotspots, getStatusFromWaterLevel } from './data/mockData';
+import { getStatusFromWaterLevel } from './data/mockData';
 import { getSmartRoute, createFloodZones, formatDuration, formatDistance, checkRouteIntersection } from './services/routingService';
-import { subscribeToFloodData } from './services/firebase';
+import { subscribeToFloodData, submitFloodReport } from './services/firebase';
 import { useAuth } from './contexts/AuthContext';
+import { useAdmin } from './contexts/AdminContext';
+import { useUploadQueue } from './hooks/useUploadQueue';
+import { ref as fRef, set as fSet } from 'firebase/database';
+import { database as db } from './services/firebase';
 import Toast from './components/Toast';
 
 function App() {
   const { user, requireAuth, logout } = useAuth();
+  const { isAdmin } = useAdmin();
+  const { enqueue: enqueueUpload } = useUploadQueue();
   const [toast, setToast] = useState(null);
-  const [hotspots, setHotspots] = useState(floodHotspots);
+  const [hotspots, setHotspots] = useState([]);
   const [selectedHotspot, setSelectedHotspot] = useState(null);
   const [destination, setDestination] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -43,11 +50,18 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showHistoricalData, setShowHistoricalData] = useState(false);
+  const [showHazardMap, setShowHazardMap] = useState(false);
+
+  // Settings state
+  const [showFloodZones, setShowFloodZones] = useState(true);
+  const [soundAlerts, setSoundAlerts] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Ref for map controls and previous location
   const mapRef = useRef(null);
   const prevLocationRef = useRef(null);
   const watchIdRef = useRef(null);
+  const prevSensorStatusesRef = useRef({});
 
   // Calculate heading from previous to current position
   const calculateHeading = (prev, current) => {
@@ -129,17 +143,39 @@ function App() {
     setFloodZones(zones);
   }, [hotspots]);
 
-  // Simulate real-time data updates
+  // Real-time flood data subscription (controlled by autoRefresh setting)
   useEffect(() => {
+    if (!autoRefresh) return;
+
     const unsubscribe = subscribeToFloodData((data) => {
       if (data && data.length > 0) {
+        // Detect new flooded sensors for sound alerts
+        if (soundAlerts) {
+          data.forEach((sensor) => {
+            const prevStatus = prevSensorStatusesRef.current[sensor.id];
+            if (sensor.status === 'flooded' && prevStatus !== 'flooded') {
+              try {
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                osc.connect(ctx.destination);
+                osc.frequency.value = 880;
+                osc.start();
+                osc.stop(ctx.currentTime + 0.3);
+              } catch (_) { /* AudioContext not available */ }
+            }
+          });
+        }
+        // Update tracked statuses
+        data.forEach((sensor) => {
+          prevSensorStatusesRef.current[sensor.id] = sensor.status;
+        });
         setHotspots(data);
         setLastUpdate(new Date());
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [autoRefresh, soundAlerts]);
 
 
   const handleHotspotSelect = (hotspot) => {
@@ -262,11 +298,33 @@ function App() {
   };
 
   // Handle crowdsourced flood report submission
-  const handleReportSubmit = (report) => {
-    setCrowdsourcedReports(prev => [...prev, report]);
-    setToast({ message: 'Flood report submitted successfully!', type: 'success' });
+  const handleReportSubmit = async (report, mediaFile) => {
+    try {
+      await submitFloodReport(report);
+    } catch (_) {
+      setToast({ message: 'Failed to save report. Please try again.', type: 'error' });
+      return;
+    }
 
-    // Also add to flood zones if severity is warning or flooded
+    // Write /media_uploads metadata; upload queue fills in storage paths
+    if (mediaFile && user) {
+      await fSet(fRef(db, `media_uploads/${report.id}`), {
+        reportId: report.id,
+        uploaderId: user.uid,
+        uploaderName: user.displayName || 'Anonymous',
+        type: mediaFile.type.startsWith('video/') ? 'video' : 'photo',
+        fileSize: mediaFile.size,
+        coordinates: report.coordinates,
+        capturedAt: new Date().toISOString(),
+        uploadedAt: null,
+        processingStatus: 'queued',
+      });
+      await enqueueUpload(report.id, mediaFile);
+    }
+
+    setCrowdsourcedReports(prev => [...prev, report]);
+    setToast({ message: 'Flood report submitted!', type: 'success' });
+
     if (report.severity === 'warning' || report.severity === 'flooded') {
       const newHotspot = {
         id: report.id,
@@ -308,6 +366,7 @@ function App() {
           isFollowMode={isFollowMode}
           onFollowModeChange={setIsFollowMode}
           showHistoricalData={showHistoricalData}
+          showFloodZones={showFloodZones}
           onError={(msg) => setToast({ message: msg, type: 'error' })}
         />
       </div>
@@ -519,6 +578,18 @@ function App() {
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
+                  setShowHazardMap(true);
+                }}
+                className="w-full p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 text-left text-white flex items-center gap-3 active:scale-[0.98] transition-transform text-sm"
+              >
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Hazard Map (UP NOAH)
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
                   setShowSettings(true);
                 }}
                 className="w-full p-3 rounded-xl bg-[#162d4d] text-left text-white flex items-center gap-3 active:scale-[0.98] transition-transform text-sm"
@@ -600,8 +671,11 @@ function App() {
                   <p className="text-sm text-white">Show Flood Zones</p>
                   <p className="text-[10px] text-slate-400">Display flood risk areas on map</p>
                 </div>
-                <div className="w-10 h-6 bg-[#00d4ff]/30 rounded-full relative cursor-pointer">
-                  <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-[#00d4ff] rounded-full" />
+                <div
+                  className={`w-10 h-6 rounded-full relative cursor-pointer transition-colors ${showFloodZones ? 'bg-[#00d4ff]/30' : 'bg-slate-700'}`}
+                  onClick={() => setShowFloodZones(!showFloodZones)}
+                >
+                  <div className={`absolute top-0.5 w-5 h-5 rounded-full transition-transform ${showFloodZones ? 'right-0.5 bg-[#00d4ff]' : 'left-0.5 bg-slate-500'}`} />
                 </div>
               </div>
               <div className="flex items-center justify-between p-3 rounded-xl bg-[#162d4d]">
@@ -609,17 +683,23 @@ function App() {
                   <p className="text-sm text-white">Sound Alerts</p>
                   <p className="text-[10px] text-slate-400">Play sound for flood warnings</p>
                 </div>
-                <div className="w-10 h-6 bg-slate-700 rounded-full relative cursor-pointer">
-                  <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-slate-500 rounded-full" />
+                <div
+                  className={`w-10 h-6 rounded-full relative cursor-pointer transition-colors ${soundAlerts ? 'bg-[#00d4ff]/30' : 'bg-slate-700'}`}
+                  onClick={() => setSoundAlerts(!soundAlerts)}
+                >
+                  <div className={`absolute top-0.5 w-5 h-5 rounded-full transition-transform ${soundAlerts ? 'right-0.5 bg-[#00d4ff]' : 'left-0.5 bg-slate-500'}`} />
                 </div>
               </div>
               <div className="flex items-center justify-between p-3 rounded-xl bg-[#162d4d]">
                 <div>
                   <p className="text-sm text-white">Auto-refresh Data</p>
-                  <p className="text-[10px] text-slate-400">Update flood data every 5 minutes</p>
+                  <p className="text-[10px] text-slate-400">Receive live sensor updates</p>
                 </div>
-                <div className="w-10 h-6 bg-[#00d4ff]/30 rounded-full relative cursor-pointer">
-                  <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-[#00d4ff] rounded-full" />
+                <div
+                  className={`w-10 h-6 rounded-full relative cursor-pointer transition-colors ${autoRefresh ? 'bg-[#00d4ff]/30' : 'bg-slate-700'}`}
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                >
+                  <div className={`absolute top-0.5 w-5 h-5 rounded-full transition-transform ${autoRefresh ? 'right-0.5 bg-[#00d4ff]' : 'left-0.5 bg-slate-500'}`} />
                 </div>
               </div>
             </div>
@@ -678,6 +758,12 @@ function App() {
 
       {/* Login Prompt Modal */}
       <LoginPrompt />
+
+      {/* Hazard Map Panel */}
+      <HazardMapPanel 
+        isOpen={showHazardMap} 
+        onClose={() => setShowHazardMap(false)} 
+      />
 
       {/* Toast Notification */}
       {toast && (

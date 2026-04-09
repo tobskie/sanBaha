@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, push } from 'firebase/database';
+import { getDatabase, ref, onValue, push, get, set as dbSet } from 'firebase/database';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getStatusFromWaterLevel } from '../data/mockData';
@@ -77,3 +77,12 @@ export const subscribeToFloodData = (callback) => {
   
   return unsubscribe;
 };
+
+// Media consent helpers
+export const hasMediaConsent = async (uid) => {
+  const snap = await get(ref(database, `users/${uid}/mediaConsentGiven`));
+  return snap.val() === true;
+};
+
+export const setMediaConsent = (uid) =>
+  dbSet(ref(database, `users/${uid}/mediaConsentGiven`), true);

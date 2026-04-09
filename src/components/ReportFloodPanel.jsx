@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import MediaUpload from './MediaUpload';
+import { hasMediaConsent, setMediaConsent } from '../services/firebase';
+import { useAuth } from '../contexts/AuthContext';
 
 const ReportFloodPanel = ({
     isOpen,
@@ -12,6 +15,9 @@ const ReportFloodPanel = ({
     const [locationName, setLocationName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const { user } = useAuth();
+    const [mediaFile, setMediaFile] = useState(null);
+    const [showConsentPrompt, setShowConsentPrompt] = useState(false);
 
     // Get location name from coordinates
     useEffect(() => {
@@ -33,34 +39,40 @@ const ReportFloodPanel = ({
             return;
         }
 
-        setIsSubmitting(true);
+        // Consent check for media
+        if (mediaFile && user) {
+            const consented = await hasMediaConsent(user.uid);
+            if (!consented) {
+                setShowConsentPrompt(true);
+                return;
+            }
+        }
 
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        setIsSubmitting(true);
 
         const report = {
             id: `crowd-${Date.now()}`,
             type: 'crowdsourced',
-            coordinates: [userLocation[1], userLocation[0]], // [lat, lng] to match hotspots
+            coordinates: [userLocation[1], userLocation[0]],
             severity,
             description: description || getSeverityLabel(severity),
             locationName: locationName || 'Unknown Location',
             reportedAt: new Date().toISOString(),
-            reporterId: 'anonymous',
+            reporterId: user?.uid || 'anonymous',
             upvotes: 0,
             verified: false,
         };
 
-        onSubmit(report);
+        onSubmit(report, mediaFile);
         setIsSubmitting(false);
         setShowSuccess(true);
 
         setTimeout(() => {
             setShowSuccess(false);
             onClose();
-            // Reset form
             setSeverity('warning');
             setDescription('');
+            setMediaFile(null);
         }, 2000);
     };
 
@@ -192,6 +204,14 @@ const ReportFloodPanel = ({
                             />
                         </div>
 
+                        {/* Media Attachment */}
+                        <div className="mb-4">
+                            <label className="block text-[10px] text-slate-400 mb-2 uppercase tracking-wider">
+                                Photo / Video
+                            </label>
+                            <MediaUpload onChange={setMediaFile} disabled={isSubmitting} />
+                        </div>
+
                         {/* Submit Button */}
                         <button
                             onClick={handleSubmit}
@@ -227,6 +247,36 @@ const ReportFloodPanel = ({
                         <p className="mt-3 text-[10px] text-slate-500 text-center">
                             Your report helps keep the community safe. Reports are anonymous.
                         </p>
+
+                        {/* Consent Prompt */}
+                        {showConsentPrompt && (
+                            <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6">
+                                <div className="absolute inset-0 bg-black/80" onClick={() => setShowConsentPrompt(false)} />
+                                <div className="relative glass-card rounded-2xl p-5 max-w-xs">
+                                    <p className="text-sm text-white mb-3">
+                                        Your photo/video, name, and location will be stored by sanBaha and visible to authorized emergency responders. It will not be shared publicly.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            className="flex-1 py-2 rounded-lg bg-[#162d4d] text-slate-300 text-sm"
+                                            onClick={() => setShowConsentPrompt(false)}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            className="flex-1 py-2 rounded-lg bg-gradient-to-r from-[#00d4ff] to-[#00ff88] text-[#0a1628] text-sm font-semibold"
+                                            onClick={async () => {
+                                                await setMediaConsent(user.uid);
+                                                setShowConsentPrompt(false);
+                                                handleSubmit();
+                                            }}
+                                        >
+                                            I Agree
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
