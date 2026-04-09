@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import AdminDashboard from './components/AdminDashboard';
 import FloodMap from './components/FloodMap';
 import BottomSheet from './components/BottomSheet';
 import MobileHeader from './components/MobileHeader';
@@ -346,7 +348,10 @@ function App() {
   };
 
   return (
-    <div className="h-full w-full bg-[#0a1628] overflow-hidden relative">
+    <Routes>
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/*" element={
+      <div className="h-full w-full bg-[#0a1628] overflow-hidden relative">
       {/* Portal target for expanded search (must be at app root to escape BottomSheet overflow) */}
       <div id="search-portal" className="absolute inset-0 z-[2500] pointer-events-none [&>*]:pointer-events-auto" />
       {/* Mobile Header */}
@@ -802,6 +807,8 @@ function App() {
         />
       )}
     </div>
+      } />
+    </Routes>
   );
 }
 
