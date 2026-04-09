@@ -376,7 +376,10 @@ export async function getSmartRouteWithAvoidance(origin, destination, floodPoint
         if (!initial.safeRoute.isFlooded) return { ...initial, unavoidable: false };
 
         // Step 2: Compute bypass waypoints for each crossed flood zone
+        // initial.safeRoute.geometry is a raw GeoJSON geometry (not a Feature wrapper)
+        // as set by findSafestRoute: `geometry: route.geometry`
         const bypassWaypoints = computeBypassWaypoints(initial.safeRoute, initial.floodZones);
+        if (bypassWaypoints.length === 0) return { ...initial, unavoidable: true };
 
         // Step 3: Retry with waypoints
         const retryData = await getDirections(origin, destination, true, bypassWaypoints);
@@ -394,7 +397,7 @@ export async function getSmartRouteWithAvoidance(origin, destination, floodPoint
             unavoidable: retryAnalysis.safeRoute.isFlooded,
         };
     } catch (error) {
-        console.error('Smart routing error:', error);
+        console.error('Smart routing with avoidance error:', error);
         return { success: false, error: error.message };
     }
 }

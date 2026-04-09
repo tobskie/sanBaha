@@ -137,4 +137,28 @@ describe('getSmartRouteWithAvoidance', () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe('network error');
   });
+
+  it('returns unavoidable:false when retry finds a dry route', async () => {
+    // Reset persistent mockReturnValue from previous tests so the default falls through to false
+    turf.booleanIntersects.mockReset();
+    // Call #1: checkRouteIntersection (initial fetch) → flooded
+    // Call #2: computeBypassWaypoints → zone intersects route → waypoint generated
+    // Call #3+: checkRouteIntersection (retry fetch) → dry (default returns undefined/falsy)
+    turf.booleanIntersects.mockReturnValueOnce(true).mockReturnValueOnce(true);
+    // Subsequent calls (inside findSafestRoute on retry fetch): dry (default mock returns false)
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        routes: [{ geometry: { type: 'LineString', coordinates: [[121.1, 13.9],[121.2,14.1]] }, duration: 600, distance: 5000 }]
+      })
+    });
+    const { getSmartRouteWithAvoidance } = await import('./routingService.js');
+    const floodPoints = [{ id: '1', name: 'Quiib', status: 'flooded', coordinates: [13.95, 121.15], waterLevel: 1.2 }];
+    const result = await getSmartRouteWithAvoidance([121.1, 13.9], [121.2, 14.1], floodPoints);
+    expect(result.success).toBe(true);
+    expect(result.unavoidable).toBe(false);
+    expect(result.safeRoute.isFlooded).toBe(false);
+    // Two fetches: initial + retry
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
 });
