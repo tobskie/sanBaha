@@ -1,0 +1,34 @@
+{
+  "rules": {
+    "flood_sensors": {
+      ".read": true,
+      ".write": false
+    },
+    "crowd_reports": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "media_uploads": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "social_intake": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": false
+    },
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "system": {
+      ".read": true,
+      ".write": false
+    },
+    "logs": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": false
+    }
+  }
+}
