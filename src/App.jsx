@@ -459,6 +459,12 @@ function App() {
                 ⚠ {routeData.warnings.map(w => w.name).join(', ')}
               </span>
             )}
+            {/* Rain precaution pill */}
+            {routeData.precautionaryWarnings?.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-[9px] font-semibold flex-shrink-0">
+                🌧 High rainfall near route
+              </span>
+            )}
             {/* Close */}
             <button
               onClick={handleClearRoute}
