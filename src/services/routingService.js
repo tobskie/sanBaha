@@ -5,6 +5,8 @@ const MAPBOX_TOKEN = 'pk.eyJ1IjoiYW50b25vbGltcG8iLCJhIjoiY21sZjYxdnNrMDFmbjNmcjV
 
 // Buffer radius around flood points (in kilometers)
 const FLOOD_BUFFER_RADIUS = 0.15; // 150 meters
+export const RAIN_PRECAUTION_THRESHOLD = 25; // mm — moderate rainfall (25mm), road ponding likely
+const PRECAUTIONARY_BUFFER_RADIUS = 0.10; // 100m — smaller buffer for pre-emptive caution
 
 // Lipa City bounding box for geocoding bias
 const LIPA_BBOX = [121.05, 13.85, 121.25, 14.05];
@@ -162,21 +164,33 @@ export async function getDirections(origin, destination, alternatives = true, wa
 }
 
 /**
- * Create circular buffer polygons around flood points
+ * Create circular buffer polygons around flood points.
+ * Includes flooded/warning sensors at 150m radius and clear sensors
+ * with rain_mm >= RAIN_PRECAUTION_THRESHOLD at 100m radius (precautionary).
  * @param {Array} floodPoints - Array of flood hotspot objects
  * @returns {Object} GeoJSON FeatureCollection of flood zones
  */
 export function createFloodZones(floodPoints) {
-    const floodedPoints = floodPoints.filter(p => p.status === 'flooded' || p.status === 'warning');
+    const relevantPoints = floodPoints.filter(p =>
+        p.status === 'flooded' ||
+        p.status === 'warning' ||
+        (p.status === 'clear' && (p.rain_mm ?? 0) >= RAIN_PRECAUTION_THRESHOLD)
+    );
 
-    const features = floodedPoints.map(point => {
+    const features = relevantPoints.map(point => {
+        const zoneStatus = (point.status === 'clear' && (point.rain_mm ?? 0) >= RAIN_PRECAUTION_THRESHOLD)
+            ? 'precautionary'
+            : point.status;
+
+        const radius = zoneStatus === 'precautionary' ? PRECAUTIONARY_BUFFER_RADIUS : FLOOD_BUFFER_RADIUS;
         const center = turf.point([point.coordinates[1], point.coordinates[0]]);
-        const buffer = turf.buffer(center, FLOOD_BUFFER_RADIUS, { units: 'kilometers' });
+        const buffer = turf.buffer(center, radius, { units: 'kilometers' });
         buffer.properties = {
             id: point.id,
             name: point.name,
-            status: point.status,
-            waterLevel: point.waterLevel
+            status: zoneStatus,
+            waterLevel: point.waterLevel,
+            rain_mm: point.rain_mm ?? 0,
         };
         return buffer;
     });
@@ -292,11 +306,11 @@ export function computeBypassWaypoints(safeRoute, floodZones) {
 }
 
 /**
- * Find the shortest dry path from alternatives
- * Priority: 1. Avoid flooded areas  2. Shortest distance
+ * Find the shortest dry path from alternatives.
+ * Priority: 1. Avoid flooded/warning areas  2. Avoid precautionary areas  3. Shortest duration
  * @param {Array} routes - Array of route objects from Mapbox
- * @param {Object} floodZones - GeoJSON flood zones
- * @returns {Object} { safeRoute, allRoutes, warnings }
+ * @param {Object} floodZones - GeoJSON flood zones (may include precautionary zones)
+ * @returns {Object} { safeRoute, allRoutes, hasSafeRoute, warnings, precautionaryWarnings }
  */
 export function findSafestRoute(routes, floodZones) {
     const analyzedRoutes = routes.map((route, index) => {
@@ -306,36 +320,42 @@ export function findSafestRoute(routes, floodZones) {
         };
 
         const intersection = checkRouteIntersection(routeGeoJSON, floodZones);
-        const floodPenalty = intersection.intersects
-            ? 1000000 + (intersection.intersectedZones.length * 10000) // Heavy penalty for flooded routes
-            : 0;
+
+        let floodPenalty = 0;
+        if (intersection.intersects) {
+            const hasPrecautionaryOnly = intersection.intersectedZones.every(z => z.status === 'precautionary');
+            floodPenalty = hasPrecautionaryOnly
+                ? 500000
+                : 1000000 + (intersection.intersectedZones.length * 10000);
+        }
 
         return {
             index,
             route,
             geometry: route.geometry,
-            duration: route.duration, // in seconds
-            distance: route.distance, // in meters
-            isFlooded: intersection.intersects,
+            duration: route.duration,
+            distance: route.distance,
+            isFlooded: intersection.intersects && intersection.intersectedZones.some(z => z.status !== 'precautionary'),
             floodedZones: intersection.intersectedZones,
-            // Score = flood penalty + duration (fastest dry route wins, like Waze/Google Maps)
             score: floodPenalty + route.duration
         };
     });
 
-    // Sort by score: dry routes first, then by fastest duration
     analyzedRoutes.sort((a, b) => a.score - b.score);
 
     const safeRoutes = analyzedRoutes.filter(r => !r.isFlooded);
-
-    // The routes are pre-sorted by score (incorporating duration), so index 0 is the fastest available optimal route
     const safeRoute = analyzedRoutes[0];
+
+    const precautionaryWarnings = safeRoute.isFlooded
+        ? []
+        : safeRoute.floodedZones.filter(z => z.status === 'precautionary');
 
     return {
         safeRoute,
         allRoutes: analyzedRoutes,
         hasSafeRoute: safeRoutes.length > 0,
-        warnings: safeRoute.isFlooded ? safeRoute.floodedZones : []
+        warnings: safeRoute.isFlooded ? safeRoute.floodedZones.filter(z => z.status !== 'precautionary') : [],
+        precautionaryWarnings,
     };
 }
 

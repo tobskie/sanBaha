@@ -145,6 +145,74 @@ describe('computeBypassWaypoints', () => {
   });
 });
 
+describe('createFloodZones', () => {
+  it('excludes clear sensors with rain_mm below threshold', async () => {
+    const { createFloodZones } = await import('./routingService.js');
+    const points = [{ id: '1', name: 'Sensor A', status: 'clear', rain_mm: 10, coordinates: [13.9, 121.1], waterLevel: 5 }];
+    const result = createFloodZones(points);
+    expect(result.features).toHaveLength(0);
+  });
+
+  it('includes clear sensors with rain_mm >= 25 as precautionary', async () => {
+    const { createFloodZones } = await import('./routingService.js');
+    const points = [{ id: '1', name: 'Sensor A', status: 'clear', rain_mm: 25, coordinates: [13.9, 121.1], waterLevel: 5 }];
+    const result = createFloodZones(points);
+    expect(result.features).toHaveLength(1);
+    expect(result.features[0].properties.status).toBe('precautionary');
+  });
+
+  it('still includes flooded and warning sensors regardless of rain_mm', async () => {
+    const { createFloodZones } = await import('./routingService.js');
+    const points = [
+      { id: '1', name: 'A', status: 'flooded', rain_mm: 0, coordinates: [13.9, 121.1], waterLevel: 80 },
+      { id: '2', name: 'B', status: 'warning', rain_mm: 0, coordinates: [13.91, 121.11], waterLevel: 30 },
+    ];
+    const result = createFloodZones(points);
+    expect(result.features).toHaveLength(2);
+  });
+});
+
+describe('findSafestRoute precautionary penalties', () => {
+  it('applies lower penalty (500000) to precautionary zones than flooded (1000000)', async () => {
+    // Make booleanIntersects return true so the route is considered to cross the zone
+    turf.booleanIntersects.mockReturnValueOnce(true);
+    const { findSafestRoute } = await import('./routingService.js');
+    const routes = [
+      { geometry: { type: 'LineString', coordinates: [[121.1, 13.9], [121.2, 14.1]] }, duration: 300, distance: 3000 }
+    ];
+    const precautionaryZones = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [[]] },
+        properties: { name: 'Sensor A', status: 'precautionary' }
+      }]
+    };
+    const result = findSafestRoute(routes, precautionaryZones);
+    // score = 500000 + 300 (duration) = 500300 — not 1000000+
+    expect(result.safeRoute.score).toBe(500300);
+  });
+
+  it('returns precautionaryWarnings with zones whose status is precautionary', async () => {
+    turf.booleanIntersects.mockReturnValueOnce(true);
+    const { findSafestRoute } = await import('./routingService.js');
+    const routes = [
+      { geometry: { type: 'LineString', coordinates: [[121.1, 13.9], [121.2, 14.1]] }, duration: 300, distance: 3000 }
+    ];
+    const zones = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [[]] },
+        properties: { name: 'Sensor A', status: 'precautionary' }
+      }]
+    };
+    const result = findSafestRoute(routes, zones);
+    expect(result.precautionaryWarnings).toHaveLength(1);
+    expect(result.precautionaryWarnings[0].name).toBe('Sensor A');
+  });
+});
+
 describe('getSmartRouteWithAvoidance', () => {
   it('returns immediately when initial route is dry', async () => {
     // booleanIntersects stays false (default mock) → no flood
@@ -163,7 +231,7 @@ describe('getSmartRouteWithAvoidance', () => {
   });
 
   it('retries with bypass waypoints when initial route is flooded', async () => {
-    turf.booleanIntersects.mockReturnValue(true); // all routes flooded
+    turf.booleanIntersects.mockReturnValueOnce(true).mockReturnValueOnce(true).mockReturnValueOnce(true); // all routes flooded
     fetchSpy.mockResolvedValue({
       ok: true,
       json: async () => ({
