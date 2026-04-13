@@ -4,15 +4,15 @@ import AdminDashboard from './components/AdminDashboard';
 import FloodMap from './components/FloodMap';
 import BottomSheet from './components/BottomSheet';
 import MobileHeader from './components/MobileHeader';
-import FloatingActions from './components/FloatingActions';
 import HotspotDetail from './components/HotspotDetail';
 import NavigationPanel from './components/NavigationPanel';
 import ReportFloodPanel from './components/ReportFloodPanel';
 import HazardMapPanel from './components/HazardMapPanel';
 import LoginPrompt from './components/LoginPrompt';
 import { getStatusFromWaterLevel } from './data/mockData';
-import { getSmartRouteWithAvoidance, createFloodZones, formatDuration, formatDistance, checkRouteIntersection } from './services/routingService';
+import { getSmartRouteWithAvoidance, createFloodZones, checkRouteIntersection, loadHistoricalFloodZones, mergeHistoricalZones, findSafestRoute } from './services/routingService';
 import { subscribeToFloodData, submitFloodReport } from './services/firebase';
+import { isRainfallActive } from './services/weatherService';
 import { useAuth } from './contexts/AuthContext';
 import { useAdmin } from './contexts/AdminContext';
 import { useUploadQueue } from './hooks/useUploadQueue';
@@ -21,6 +21,8 @@ import { ref as fRef, set as fSet } from 'firebase/database';
 import { database as db } from './services/firebase';
 import Toast from './components/Toast';
 import ReviewQueuePanel from './components/ReviewQueuePanel';
+import NavigationBanner from './components/NavigationBanner';
+import useNavigationStep from './hooks/useNavigationStep';
 
 function App() {
   const { user, requireAuth, logout } = useAuth();
@@ -42,6 +44,7 @@ function App() {
   const [isRouting, setIsRouting] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [userHeading, setUserHeading] = useState(0);
+  const [isLocationAcquired, setIsLocationAcquired] = useState(false);
   const [showNavigationPanel, setShowNavigationPanel] = useState(false);
   const [originLocation, setOriginLocation] = useState(null);
   const [destLocation, setDestLocation] = useState(null);
@@ -57,6 +60,7 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showHistoricalData, setShowHistoricalData] = useState(false);
   const [showHazardMap, setShowHazardMap] = useState(false);
+  const [weatherData, setWeatherData] = useState(null);
 
   // Settings state
   const [showFloodZones, setShowFloodZones] = useState(true);
@@ -67,7 +71,10 @@ function App() {
   const mapRef = useRef(null);
   const prevLocationRef = useRef(null);
   const watchIdRef = useRef(null);
+  const isLocationAcquiredRef = useRef(false);
   const prevSensorStatusesRef = useRef({});
+
+  const MAPBOX_TOKEN = 'pk.eyJ1IjoiYW50b25vbGltcG8iLCJhIjoiY21sZjYxdnNrMDFmbjNmcjVnZGFmZmlwaiJ9.p6iMH63mAesUTBbpoufwBw';
 
   // Calculate heading from previous to current position
   const calculateHeading = (prev, current) => {
@@ -84,29 +91,44 @@ function App() {
   // Continuous GPS tracking
   useEffect(() => {
     if (navigator.geolocation) {
-      // Initial position
+      const ACCURACY_THRESHOLD_M = 200; // accept positions up to 200m accuracy
+      const FALLBACK_TIMEOUT_MS = 10000; // after 10s, accept whatever we have
+
+      // Show last-known position immediately so the marker is visible on startup.
+      // isLocationAcquired stays false until watchPosition delivers an accurate fix.
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const newLocation = [position.coords.longitude, position.coords.latitude];
           setUserLocation(newLocation);
           prevLocationRef.current = newLocation;
-
-          // Use device heading if available
-          if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
-            setUserHeading(position.coords.heading);
-          }
         },
-        (error) => {
-          console.error('Initial location error:', error);
-          // Default to Lipa City center if location unavailable
-          setUserLocation([121.1589, 13.9411]);
-        },
-        { enableHighAccuracy: true }
+        () => { /* silent — watchPosition will handle errors */ },
+        { enableHighAccuracy: false, maximumAge: Infinity, timeout: 5000 }
       );
 
-      // Watch position for real-time updates
+      // Fallback: if no accurate fix within FALLBACK_TIMEOUT_MS, accept any position
+      const fallbackTimer = setTimeout(() => {
+        if (!isLocationAcquiredRef.current) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const newLocation = [position.coords.longitude, position.coords.latitude];
+              setUserLocation(newLocation);
+              setIsLocationAcquired(true);
+              isLocationAcquiredRef.current = true;
+              prevLocationRef.current = newLocation;
+            },
+            () => {},
+            { enableHighAccuracy: false, maximumAge: 60000, timeout: 5000 }
+          );
+        }
+      }, FALLBACK_TIMEOUT_MS);
+
+      // Watch position for real-time updates — maximumAge:0 forces fresh GPS reads
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
+          // Reject fixes that are too inaccurate (but fallback timer handles the timeout case)
+          if (position.coords.accuracy > ACCURACY_THRESHOLD_M) return;
+
           const newLocation = [position.coords.longitude, position.coords.latitude];
 
           // Calculate heading from movement if device heading not available
@@ -120,6 +142,8 @@ function App() {
           }
 
           setUserLocation(newLocation);
+          setIsLocationAcquired(true);
+          isLocationAcquiredRef.current = true;
           prevLocationRef.current = newLocation;
         },
         (error) => {
@@ -127,13 +151,14 @@ function App() {
         },
         {
           enableHighAccuracy: true,
-          maximumAge: 1000,
-          timeout: 10000
+          maximumAge: 0,  // never serve a cached position
+          timeout: 30000, // allow up to 30s for a cold GPS fix
         }
       );
 
       // Cleanup on unmount
       return () => {
+        clearTimeout(fallbackTimer);
         if (watchIdRef.current !== null) {
           navigator.geolocation.clearWatch(watchIdRef.current);
         }
@@ -191,6 +216,33 @@ function App() {
     }
   };
 
+  const handleReroute = async (newOrigin) => {
+    if (!destLocation?.coordinates) return;
+    try {
+      const result = await getSmartRouteWithAvoidance(
+        newOrigin,
+        destLocation.coordinates,
+        hotspots
+      );
+      if (result.success) {
+        setRouteData(result);
+      }
+    } catch {
+      // isOffRoute auto-clears when routeData changes; if reroute fails just wait
+    }
+  };
+
+  const {
+    currentStep,
+    steps: navSteps,
+    distanceToManeuver,
+    remainingDistance,
+    remainingDuration,
+    stepsWithFloodWarning,
+    currentLanes,
+    isOffRoute,
+  } = useNavigationStep(routeData, userLocation, floodZones, handleReroute);
+
   // Navigate with coordinates
   const handleNavigateWithCoords = async (origin, dest) => {
     setIsRouting(true);
@@ -198,16 +250,51 @@ function App() {
       const result = await getSmartRouteWithAvoidance(origin, dest, hotspots);
 
       if (result.success) {
+        // If rain is active and historical data is enabled, merge historical
+        // flood zones into the avoidance set and re-score the routes
+        if (showHistoricalData && isRainfallActive(weatherData)) {
+          const historicalGeoJSON = await loadHistoricalFloodZones();
+          if (historicalGeoJSON && result.floodZones) {
+            const mergedZones = mergeHistoricalZones(result.floodZones, historicalGeoJSON);
+            // Re-score all candidate routes against the merged zones so the
+            // 250K historical penalty actually influences route selection
+            const rawRoutes = result.allRoutes.map(r => r.route);
+            const reScored = findSafestRoute(rawRoutes, mergedZones);
+            result.floodZones = mergedZones;
+            result.safeRoute = reScored.safeRoute;
+            result.allRoutes = reScored.allRoutes;
+            result.hasSafeRoute = reScored.hasSafeRoute;
+            result.warnings = reScored.warnings;
+            result.precautionaryWarnings = reScored.precautionaryWarnings;
+            result.historicalWarnings = reScored.historicalWarnings;
+          }
+        }
+
         setRouteData(result);
         setShowNavigationPanel(false);
         setSelectedHotspot(null);
         setIsFollowMode(true); // Start following user like Google Maps
-        setToast({
-          message: result.unavoidable
-            ? 'Only available route crosses a flood zone. Proceed with caution.'
-            : 'Route found! Follow blue line.',
-          type: result.unavoidable ? 'warning' : 'info'
-        });
+
+        // Pre-warm service worker tile cache for the route
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller && result?.safeRoute?.geometry) {
+          const coords = result.safeRoute.geometry.coordinates;
+          const lngs = coords.map(c => c[0]);
+          const lats = coords.map(c => c[1]);
+          const bbox = [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
+          navigator.serviceWorker.controller.postMessage({ type: 'START_NAV', bbox, token: MAPBOX_TOKEN });
+        }
+
+        // Build toast message
+        let toastMsg = 'Route found! Follow blue line.';
+        let toastType = 'info';
+        if (result.unavoidable) {
+          toastMsg = 'Only available route crosses a flood zone. Proceed with caution.';
+          toastType = 'warning';
+        } else if (result.historicalWarnings?.length > 0) {
+          toastMsg = 'Route adjusted to avoid historically flood-prone areas.';
+          toastType = 'info';
+        }
+        setToast({ message: toastMsg, type: toastType });
       } else {
         setToast({ message: 'Could not find a route: ' + result.error, type: 'error' });
       }
@@ -273,6 +360,14 @@ function App() {
     setDestination('');
     setDestLocation(null);
     setIsFollowMode(false);
+  };
+
+  // Stop navigation (clears route + notifies SW)
+  const handleStopNavigation = () => {
+    handleClearRoute();
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'END_NAV' });
+    }
   };
 
   // Refresh button handler
@@ -379,10 +474,14 @@ function App() {
           floodZones={floodZones}
           userLocation={userLocation}
           userHeading={userHeading}
+          isLocationAcquired={isLocationAcquired}
           isFollowMode={isFollowMode}
           onFollowModeChange={setIsFollowMode}
           showHistoricalData={showHistoricalData}
+          isRaining={isRainfallActive(weatherData)}
+          onWeatherUpdate={setWeatherData}
           showFloodZones={showFloodZones}
+          bottomOffset={isBottomSheetExpanded ? Math.round(window.innerHeight * 0.7) : 210}
           onError={(msg) => setToast({ message: msg, type: 'error' })}
         />
       </div>
@@ -414,69 +513,19 @@ function App() {
       />
 
 
-      {/* Floating Action Buttons */}
-      <FloatingActions
-        onNavigate={handleOpenNavigation}
-        onReport={() => setShowReportPanel(true)}
-        onRefresh={handleRefresh}
-        isRefreshing={isRefreshing}
+      {/* Navigation Banner */}
+      <NavigationBanner
+        currentStep={currentStep}
+        steps={navSteps}
+        distanceToManeuver={distanceToManeuver}
+        remainingDistance={remainingDistance}
+        remainingDuration={remainingDuration}
+        destination={destination}
+        stepsWithFloodWarning={stepsWithFloodWarning}
+        currentLanes={currentLanes}
+        isOffRoute={isOffRoute}
+        onEnd={handleStopNavigation}
       />
-
-      {/* Route Summary Card — compact top strip */}
-      {routeData?.safeRoute && !showNavigationPanel && (
-        <div className="absolute left-0 right-0 top-[56px] z-[1001]">
-          <div className={`flex items-center gap-2 px-3 py-2 border-b backdrop-blur-md ${
-            routeData.unavoidable
-              ? 'bg-amber-900/80 border-amber-500/30'
-              : routeData.safeRoute.isFlooded
-                ? 'bg-red-900/80 border-red-500/30'
-                : 'bg-[#0a1628]/90 border-emerald-500/20'
-          }`}>
-            {/* Status dot */}
-            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              routeData.unavoidable
-                ? 'bg-amber-400'
-                : routeData.safeRoute.isFlooded
-                  ? 'bg-red-400'
-                  : 'bg-emerald-400'
-            }`} />
-            {/* Destination */}
-            <span className="text-white text-xs font-semibold truncate flex-1">
-              {destination || 'Route'}
-            </span>
-            {/* ETA */}
-            <span className="text-[#00d4ff] text-xs font-bold flex-shrink-0">
-              {formatDuration(routeData.safeRoute.duration)}
-            </span>
-            <span className="text-slate-500 text-xs flex-shrink-0">·</span>
-            {/* Distance */}
-            <span className="text-slate-300 text-xs flex-shrink-0">
-              {formatDistance(routeData.safeRoute.distance)}
-            </span>
-            {/* Flood warning pill */}
-            {(routeData.safeRoute.isFlooded || routeData.unavoidable) && routeData.warnings?.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[9px] font-semibold flex-shrink-0">
-                ⚠ {routeData.warnings.map(w => w.name).join(', ')}
-              </span>
-            )}
-            {/* Rain precaution pill */}
-            {routeData.precautionaryWarnings?.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-[9px] font-semibold flex-shrink-0">
-                🌧 High rainfall near route
-              </span>
-            )}
-            {/* Close */}
-            <button
-              onClick={handleClearRoute}
-              className="w-6 h-6 rounded-lg bg-[#162d4d] flex items-center justify-center text-slate-400 active:scale-95 flex-shrink-0"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Hotspot Detail Card (only show if no route and no nav panel) */}
       {selectedHotspot && !routeData && !showNavigationPanel && (
@@ -500,6 +549,9 @@ function App() {
         onToggleExpand={setIsBottomSheetExpanded}
         isRouting={isRouting}
         userLocation={userLocation}
+        onReport={() => setShowReportPanel(true)}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
       />
 
       {/* Mobile Menu Overlay */}
