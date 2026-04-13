@@ -32,10 +32,28 @@ const STEP_C = makeStep(121.154, 13.940, 'arrive', undefined, 0);
 const routeData = makeRouteData([STEP_A, STEP_B, STEP_C]);
 const floodZones = { type: 'FeatureCollection', features: [] };
 
+// FIX 9: Flood polygon clearly covering STEP_B (lng 121.152) and NOT STEP_A (lng 121.150)
+const floodedZones = {
+  type: 'FeatureCollection',
+  features: [{
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [[[121.1515, 13.939], [121.1525, 13.939],
+        [121.1525, 13.941], [121.1515, 13.941], [121.1515, 13.939]]],
+    },
+    properties: { status: 'flooded' },
+  }],
+};
+
 describe('useNavigationStep', () => {
+  // FIX 7: Extract onReroute vi.fn() outside render callbacks
+  let onReroute;
+  beforeEach(() => { onReroute = vi.fn(); });
+
   it('starts on step 0', () => {
     const { result } = renderHook(() =>
-      useNavigationStep(routeData, [121.150, 13.940], floodZones, vi.fn())
+      useNavigationStep(routeData, [121.150, 13.940], floodZones, onReroute)
     );
     expect(result.current.currentStepIndex).toBe(0);
     expect(result.current.currentStep.maneuver.type).toBe('depart');
@@ -43,7 +61,7 @@ describe('useNavigationStep', () => {
 
   it('advances step when within 30m of next maneuver', () => {
     const { result, rerender } = renderHook(
-      ({ loc }) => useNavigationStep(routeData, loc, floodZones, vi.fn()),
+      ({ loc }) => useNavigationStep(routeData, loc, floodZones, onReroute),
       { initialProps: { loc: [121.150, 13.940] } }
     );
     act(() => {
@@ -54,7 +72,7 @@ describe('useNavigationStep', () => {
 
   it('does not advance before within 30m', () => {
     const { result, rerender } = renderHook(
-      ({ loc }) => useNavigationStep(routeData, loc, floodZones, vi.fn()),
+      ({ loc }) => useNavigationStep(routeData, loc, floodZones, onReroute),
       { initialProps: { loc: [121.150, 13.940] } }
     );
     act(() => {
@@ -64,15 +82,16 @@ describe('useNavigationStep', () => {
   });
 
   it('returns distanceToManeuver in metres', () => {
+    // Use a location slightly offset from STEP_A maneuver so distance > 0
     const { result } = renderHook(() =>
-      useNavigationStep(routeData, [121.150, 13.940], floodZones, vi.fn())
+      useNavigationStep(routeData, [121.1505, 13.940], floodZones, onReroute)
     );
     expect(result.current.distanceToManeuver).toBeGreaterThan(0);
   });
 
   it('resets to step 0 when routeData changes', () => {
     const { result, rerender } = renderHook(
-      ({ rd }) => useNavigationStep(rd, [121.152, 13.940], floodZones, vi.fn()),
+      ({ rd }) => useNavigationStep(rd, [121.152, 13.940], floodZones, onReroute),
       { initialProps: { rd: routeData } }
     );
     const newRoute = makeRouteData([
@@ -84,34 +103,22 @@ describe('useNavigationStep', () => {
   });
 
   it('annotates steps that intersect flood zones', () => {
-    const floodedZones = {
-      type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[[121.1519, 13.939], [121.1521, 13.939],
-            [121.1521, 13.941], [121.1519, 13.941], [121.1519, 13.939]]],
-        },
-        properties: { status: 'flooded' },
-      }],
-    };
     const { result } = renderHook(() =>
-      useNavigationStep(routeData, [121.150, 13.940], floodedZones, vi.fn())
+      useNavigationStep(routeData, [121.150, 13.940], floodedZones, onReroute)
     );
     expect(result.current.stepsWithFloodWarning.size).toBeGreaterThan(0);
   });
 
   it('returns steps array', () => {
     const { result } = renderHook(() =>
-      useNavigationStep(routeData, [121.150, 13.940], floodZones, vi.fn())
+      useNavigationStep(routeData, [121.150, 13.940], floodZones, onReroute)
     );
     expect(result.current.steps).toHaveLength(3);
   });
 
   it('returns remainingDistance and remainingDuration as numbers', () => {
     const { result } = renderHook(() =>
-      useNavigationStep(routeData, [121.150, 13.940], floodZones, vi.fn())
+      useNavigationStep(routeData, [121.150, 13.940], floodZones, onReroute)
     );
     expect(result.current.remainingDistance).toBeGreaterThan(0);
     expect(result.current.remainingDuration).toBeGreaterThan(0);
@@ -119,7 +126,7 @@ describe('useNavigationStep', () => {
 
   it('returns currentLanes null when step has no lane data', () => {
     const { result } = renderHook(() =>
-      useNavigationStep(routeData, [121.150, 13.940], floodZones, vi.fn())
+      useNavigationStep(routeData, [121.150, 13.940], floodZones, onReroute)
     );
     expect(result.current.currentLanes).toBeNull();
   });
@@ -133,16 +140,16 @@ describe('useNavigationStep', () => {
     ];
     const rdWithLanes = makeRouteData(stepsWithLanes);
     const { result } = renderHook(() =>
-      useNavigationStep(rdWithLanes, [121.150, 13.940], floodZones, vi.fn())
+      useNavigationStep(rdWithLanes, [121.150, 13.940], floodZones, onReroute)
     );
     expect(result.current.currentLanes).toEqual(lanes);
   });
 
   it('clears isOffRoute when routeData changes', () => {
-    vi.useFakeTimers();
+    // FIX 8: fake Date as well so Date.now() is controlled
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     // Place user far from route to trigger off-route detection
     const farLocation = [121.200, 13.940]; // well outside 50m snap threshold
-    const onReroute = vi.fn();
     const { result, rerender } = renderHook(
       ({ loc, rd }) => useNavigationStep(rd, loc, floodZones, onReroute),
       { initialProps: { loc: farLocation, rd: routeData } }
@@ -156,26 +163,14 @@ describe('useNavigationStep', () => {
     ]);
     act(() => { rerender({ loc: farLocation, rd: newRoute }); });
     expect(result.current.isOffRoute).toBe(false);
-    vi.useRealTimers();
+    vi.useRealTimers(); // FIX 8: restore real timers
   });
 
   it('does not annotate flood warnings for steps outside the flood zone', () => {
-    const floodedZones = {
-      type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[[121.1519, 13.939], [121.1521, 13.939],
-            [121.1521, 13.941], [121.1519, 13.941], [121.1519, 13.939]]],
-        },
-        properties: { status: 'flooded' },
-      }],
-    };
     const { result } = renderHook(() =>
-      useNavigationStep(routeData, [121.150, 13.940], floodedZones, vi.fn())
+      useNavigationStep(routeData, [121.150, 13.940], floodedZones, onReroute)
     );
-    // STEP_A is at lng 121.150, far from the flood zone at 121.152
+    // STEP_A is at lng 121.150, well outside the flood zone (121.1515–121.1525)
     expect(result.current.stepsWithFloodWarning.has(0)).toBe(false);
   });
 });

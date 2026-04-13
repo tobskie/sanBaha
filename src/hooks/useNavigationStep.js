@@ -4,6 +4,7 @@ import * as turf from '@turf/turf';
 const ADVANCE_THRESHOLD_M = 30;
 const OFF_ROUTE_THRESHOLD_M = 50;
 const OFF_ROUTE_SECONDS = 5;
+const REROUTE_COOLDOWN_MS = 15000;
 
 export default function useNavigationStep(routeData, userLocation, floodZones, onReroute) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -18,6 +19,10 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
   const lastRerouteRef = useRef(0);
   const stepIndexRef = useRef(0);
 
+  // FIX 1: Keep onReroute in a ref so it stays fresh without causing re-runs
+  const onRerouteRef = useRef(onReroute);
+  useEffect(() => { onRerouteRef.current = onReroute; }, [onReroute]);
+
   const steps = routeData?.safeRoute?.route?.legs?.[0]?.steps ?? [];
   const routeGeometry = routeData?.safeRoute?.geometry ?? null;
 
@@ -26,7 +31,10 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
     setCurrentStepIndex(0);
     stepIndexRef.current = 0;
     setIsOffRoute(false);
-    if (offRouteTimer.current) clearTimeout(offRouteTimer.current);
+    if (offRouteTimer.current) {
+      clearTimeout(offRouteTimer.current);
+      offRouteTimer.current = null; // FIX 3: null after clearTimeout
+    }
   }, [routeData]);
 
   // Annotate flood warnings once per route/floodZones change
@@ -49,7 +57,7 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
   // Extract lane data for current step
   useEffect(() => {
     if (!steps.length) { setCurrentLanes(null); return; }
-    const step = steps[stepIndexRef.current];
+    const step = steps[currentStepIndex]; // FIX 4: use currentStepIndex not stepIndexRef.current
     const intersection = step?.intersections?.find(i => i.lanes?.length >= 2);
     setCurrentLanes(intersection?.lanes ?? null);
   }, [currentStepIndex, routeData]);
@@ -59,8 +67,12 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
     if (!userLocation || !steps.length) return;
 
     const idx = stepIndexRef.current;
-    const nextStep = steps[idx + 1] ?? steps[idx];
-    const maneuverPt = turf.point(nextStep.maneuver.location);
+
+    // FIX 2: distanceToManeuver measures to current step's maneuver location
+    const currentStep = steps[idx];
+    const nextManeuverStep = steps[idx + 1];
+
+    const maneuverPt = turf.point(currentStep.maneuver.location);
     const userPt = turf.point(userLocation);
 
     const distM = turf.distance(userPt, maneuverPt, { units: 'meters' });
@@ -73,12 +85,16 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
     setRemainingDistance(Math.round(remaining.d));
     setRemainingDuration(Math.round(remaining.t));
 
-    // Advance step
-    if (distM <= ADVANCE_THRESHOLD_M && idx < steps.length - 1) {
-      const next = idx + 1;
-      stepIndexRef.current = next;
-      setCurrentStepIndex(next);
-      return;
+    // FIX 2: Advance step when close to NEXT maneuver
+    if (nextManeuverStep) {
+      const nextManeuverPt = turf.point(nextManeuverStep.maneuver.location);
+      const distToNext = turf.distance(userPt, nextManeuverPt, { units: 'meters' });
+      if (distToNext <= ADVANCE_THRESHOLD_M) {
+        const next = idx + 1;
+        stepIndexRef.current = next;
+        setCurrentStepIndex(next);
+        return;
+      }
     }
 
     // Off-route detection
@@ -91,10 +107,10 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
         if (!offRouteTimer.current) {
           offRouteTimer.current = setTimeout(() => {
             const now = Date.now();
-            if (now - lastRerouteRef.current > 15000) {
+            if (now - lastRerouteRef.current > REROUTE_COOLDOWN_MS) { // FIX 6: named constant
               lastRerouteRef.current = now;
               setIsOffRoute(true);
-              onReroute?.(userLocation);
+              onRerouteRef.current?.(userLocation); // FIX 1: use ref
             }
             offRouteTimer.current = null;
           }, OFF_ROUTE_SECONDS * 1000);
@@ -106,7 +122,15 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
         }
       }
     }
-  }, [userLocation]);
+
+    // FIX 5: cleanup for offRouteTimer on unmount/re-run
+    return () => {
+      if (offRouteTimer.current) {
+        clearTimeout(offRouteTimer.current);
+        offRouteTimer.current = null;
+      }
+    };
+  }, [userLocation, steps, routeGeometry]); // FIX 1: dep array (onReroute omitted, in ref)
 
   return {
     currentStepIndex,
