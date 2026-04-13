@@ -56,7 +56,7 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
 
   // Track position
   useEffect(() => {
-    if (!userLocation || !steps.length || isOffRoute) return;
+    if (!userLocation || !steps.length) return;
 
     const idx = stepIndexRef.current;
     const nextStep = steps[idx + 1] ?? steps[idx];
@@ -106,12 +106,7 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
         }
       }
     }
-  }, [userLocation, isOffRoute]);
-
-  // Clear isOffRoute when routeData updates (reroute completed)
-  useEffect(() => {
-    setIsOffRoute(false);
-  }, [routeData]);
+  }, [userLocation]);
 
   return {
     currentStepIndex,
