@@ -38,8 +38,7 @@ describe('NavigationBanner', () => {
 
   it('shows instruction and distance', () => {
     render(<NavigationBanner {...baseProps} />);
-    expect(screen.getByText('Turn right')).toBeInTheDocument();
-    expect(screen.getByText(/Rizal Ave/)).toBeInTheDocument();
+    expect(screen.getByText('Turn right onto Rizal Ave')).toBeInTheDocument();
     expect(screen.getByText(/200m/)).toBeInTheDocument();
   });
 
@@ -75,5 +74,25 @@ describe('NavigationBanner', () => {
     render(<NavigationBanner {...baseProps} onEnd={onEnd} />);
     fireEvent.click(screen.getByText('End'));
     expect(onEnd).toHaveBeenCalled();
+  });
+
+  it('does not expand when isOffRoute is true and banner is tapped', () => {
+    render(<NavigationBanner {...baseProps} isOffRoute={true} />);
+    fireEvent.click(screen.getByTestId('nav-banner-header'));
+    expect(screen.queryByText('Turn left onto Mabini St')).not.toBeInTheDocument();
+  });
+
+  it('footer is always visible', () => {
+    render(<NavigationBanner {...baseProps} />);
+    expect(screen.getByText(/Mabini St/)).toBeInTheDocument();
+    expect(screen.getByText('End')).toBeInTheDocument();
+  });
+
+  it('step list collapses on second tap', () => {
+    render(<NavigationBanner {...baseProps} />);
+    fireEvent.click(screen.getByTestId('nav-banner-header'));
+    expect(screen.getByText('Turn left onto Mabini St')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('nav-banner-header'));
+    expect(screen.queryByText('Turn left onto Mabini St')).not.toBeInTheDocument();
   });
 });

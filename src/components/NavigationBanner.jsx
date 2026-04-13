@@ -34,12 +34,9 @@ export default function NavigationBanner({
   if (!currentStep) return null;
 
   const { type, modifier, instruction } = currentStep.maneuver;
-  const parts = instruction.split(' ');
-  const verb = parts.slice(0, 2).join(' ');
-  const rest = parts.slice(2).join(' ');
 
   return (
-    <div className="absolute left-0 right-0 z-[1001]" style={{ top: 56 }}>
+    <div className="absolute left-0 right-0 z-[1001] top-14">
       {/* Banner header — tappable */}
       <div
         data-testid="nav-banner-header"
@@ -64,11 +61,8 @@ export default function NavigationBanner({
             </div>
             <div className="flex-1 min-w-0">
               {currentLanes && <LaneGuidance lanes={currentLanes} />}
-              <div className="text-sm font-bold text-white truncate">{verb}</div>
-              <div className="text-xs text-slate-400 truncate">
-                {rest && <span>{rest} · </span>}
-                <span className="text-[#00d4ff]">{formatDistance(distanceToManeuver)}</span>
-              </div>
+              <div className="text-sm font-bold text-white truncate">{instruction}</div>
+              <div className="text-xs text-[#00d4ff]">{formatDistance(distanceToManeuver)}</div>
             </div>
             <div className="text-right flex-shrink-0">
               <div className="text-sm font-bold text-[#00ff88]">{formatDuration(remainingDuration)}</div>
@@ -87,7 +81,7 @@ export default function NavigationBanner({
 
       {/* Expanded step list */}
       {isExpanded && !isOffRoute && (
-        <div className="overflow-y-auto" style={{ maxHeight: '40vh', background: '#0d1f35' }}>
+        <div className="overflow-y-auto max-h-[40vh]" style={{ background: '#0d1f35' }}>
           {steps.map((step, idx) => {
             const isCurrent = step === currentStep;
             const hasFlood = stepsWithFloodWarning.has(idx);
@@ -97,7 +91,7 @@ export default function NavigationBanner({
 
             return (
               <div
-                key={idx}
+                key={`${step.maneuver.type}-${step.maneuver.modifier ?? ''}-${idx}`}
                 className="flex items-center gap-3 px-3 py-2"
                 style={{
                   borderTop: idx > 0 ? '1px solid #1e3a5f22' : 'none',
@@ -138,7 +132,7 @@ export default function NavigationBanner({
           To <span className="text-slate-400">{destination}</span>
         </span>
         <button
-          onClick={onEnd}
+          onClick={() => onEnd?.()}
           className="px-2.5 py-1 rounded-lg text-[10px] font-medium text-red-400 active:scale-95"
           style={{ background: '#ff444422', border: '1px solid #ff444444' }}
         >
