@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, forwardRef, useImperativeHandle } fro
 import Map, { Marker, Popup, NavigationControl, Source, Layer } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { getStatusDetails } from '../data/mockData';
+import WeatherWidget from './WeatherWidget';
 
 // Mapbox access token
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiYW50b25vbGltcG8iLCJhIjoiY21sZjYxdnNrMDFmbjNmcjVnZGFmZmlwaiJ9.p6iMH63mAesUTBbpoufwBw';
@@ -75,6 +76,7 @@ const floodZoneLayer = {
             ['get', 'status'],
             'flooded', '#ff4444',
             'warning', '#ffcc00',
+            'precautionary', '#f59e0b',
             '#ff4444'
         ],
         'fill-opacity': 0.25,
@@ -90,6 +92,7 @@ const floodZoneOutline = {
             ['get', 'status'],
             'flooded', '#ff4444',
             'warning', '#ffcc00',
+            'precautionary', '#f59e0b',
             '#ff4444'
         ],
         'line-width': 2,
@@ -118,32 +121,57 @@ const historicalFloodOutline = {
 };
 
 // Vehicle icon component
-const VehicleMarker = ({ heading }) => (
+const VehicleMarker = ({ heading, acquired }) => (
     <div
         className="relative"
         style={{ transform: `rotate(${heading || 0}deg)` }}
     >
-        {/* Accuracy circle */}
-        <div className="absolute -inset-4 rounded-full bg-[#00d4ff]/20 animate-ping" />
-        <div className="absolute -inset-3 rounded-full bg-[#00d4ff]/30" />
+        {acquired ? (
+            <>
+                {/* Accuracy circle */}
+                <div className="absolute -inset-4 rounded-full bg-[#00d4ff]/20 animate-ping" />
+                <div className="absolute -inset-3 rounded-full bg-[#00d4ff]/30" />
 
-        {/* Vehicle icon - car shape */}
-        <div className="relative w-8 h-8 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 drop-shadow-lg">
-                {/* Car body */}
-                <path
-                    d="M5 11l1.5-4.5a2 2 0 011.9-1.5h7.2a2 2 0 011.9 1.5L19 11M5 11v6a1 1 0 001 1h1a1 1 0 001-1v-1h8v1a1 1 0 001 1h1a1 1 0 001-1v-6M5 11h14"
-                    stroke="#00d4ff"
-                    strokeWidth="2"
-                    fill="#0a1628"
-                />
-                {/* Wheels */}
-                <circle cx="7.5" cy="14" r="1.5" fill="#00d4ff" />
-                <circle cx="16.5" cy="14" r="1.5" fill="#00d4ff" />
-                {/* Direction indicator (front of car points up) */}
-                <path d="M12 3l2 4H10l2-4z" fill="#00ff88" />
-            </svg>
-        </div>
+                {/* Vehicle icon - top-down car */}
+                <div className="relative w-8 h-8 flex items-center justify-center">
+                    <svg viewBox="0 0 32 40" className="w-7 h-9 drop-shadow-lg" fill="none">
+                        {/* Car body */}
+                        <rect x="6" y="8" width="20" height="26" rx="4" fill="#0a1628" stroke="#00d4ff" strokeWidth="1.5"/>
+                        {/* Cabin/roof */}
+                        <rect x="9" y="12" width="14" height="10" rx="2" fill="#00d4ff" fillOpacity="0.25" stroke="#00d4ff" strokeWidth="1"/>
+                        {/* Front windshield */}
+                        <rect x="10" y="13" width="12" height="5" rx="1.5" fill="#00d4ff" fillOpacity="0.4"/>
+                        {/* Front bumper */}
+                        <rect x="9" y="8" width="14" height="3" rx="2" fill="#00d4ff" fillOpacity="0.6"/>
+                        {/* Rear bumper */}
+                        <rect x="9" y="31" width="14" height="3" rx="2" fill="#00d4ff" fillOpacity="0.4"/>
+                        {/* Front headlights */}
+                        <rect x="7" y="9" width="4" height="2.5" rx="1" fill="#00ff88"/>
+                        <rect x="21" y="9" width="4" height="2.5" rx="1" fill="#00ff88"/>
+                        {/* Rear lights */}
+                        <rect x="7" y="30" width="4" height="2" rx="1" fill="#ff4444" fillOpacity="0.8"/>
+                        <rect x="21" y="30" width="4" height="2" rx="1" fill="#ff4444" fillOpacity="0.8"/>
+                        {/* Wheels */}
+                        <rect x="3" y="11" width="4" height="7" rx="1.5" fill="#00d4ff" fillOpacity="0.7"/>
+                        <rect x="25" y="11" width="4" height="7" rx="1.5" fill="#00d4ff" fillOpacity="0.7"/>
+                        <rect x="3" y="24" width="4" height="7" rx="1.5" fill="#00d4ff" fillOpacity="0.7"/>
+                        <rect x="25" y="24" width="4" height="7" rx="1.5" fill="#00d4ff" fillOpacity="0.7"/>
+                    </svg>
+                </div>
+            </>
+        ) : (
+            /* Acquiring GPS fix — pulsing amber ring + spinner */
+            <>
+                <div className="absolute -inset-5 rounded-full bg-amber-400/20 animate-ping" />
+                <div className="absolute -inset-4 rounded-full border-2 border-amber-400/40 border-dashed animate-spin" style={{ animationDuration: '3s' }} />
+                <div className="relative w-8 h-8 rounded-full bg-[#0a1628] border-2 border-amber-400 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+            </>
+        )}
     </div>
 );
 
@@ -155,13 +183,30 @@ const FloodMap = forwardRef(({
     floodZones,
     showFloodZones = true,
     showHistoricalData = false,
+    isRaining = false,
+    onWeatherUpdate,
     userLocation,
     userHeading,
+    isLocationAcquired = false,
     isFollowMode = false,
+    bottomOffset = 0,
     onFollowModeChange,
     onError
 }, ref) => {
     const [viewState, setViewState] = useState(LIPA_CENTER);
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
     const [popupInfo, setPopupInfo] = useState(null);
     const [mapStyle, setMapStyle] = useState('dark');
 
@@ -343,7 +388,7 @@ const FloodMap = forwardRef(({
                         latitude={userLocation[1]}
                         anchor="center"
                     >
-                        <VehicleMarker heading={userHeading} />
+                        <VehicleMarker heading={userHeading} acquired={isLocationAcquired} />
                     </Marker>
                 )}
 
@@ -553,20 +598,26 @@ const FloodMap = forwardRef(({
             )}
 
             {/* GPS Status */}
-            {userLocation && (
-                <div className="absolute bottom-4 right-4 z-10 glass rounded-xl px-3 py-1.5 flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${isFollowMode ? 'bg-[#00ff88]' : 'bg-amber-400'} animate-pulse`} />
-                    <span className="text-[10px] text-slate-300">
-                        {isFollowMode ? 'Navigating' : 'GPS Active'}
-                    </span>
-                </div>
-            )}
+            <div className="absolute right-4 z-10 glass rounded-xl px-3 py-1.5 flex items-center gap-2 transition-all duration-300"
+                style={{ bottom: bottomOffset + 16 }}>
+                <span className={`w-2 h-2 rounded-full animate-pulse ${
+                    !isOnline ? 'bg-slate-500' :
+                    !isLocationAcquired ? 'bg-amber-400' :
+                    isFollowMode ? 'bg-[#00ff88]' : 'bg-[#00d4ff]'
+                }`} />
+                <span className="text-[10px] text-slate-300">
+                    {!isOnline ? 'Offline' :
+                     !isLocationAcquired ? 'Acquiring GPS…' :
+                     isFollowMode ? 'Navigating' : 'GPS Active'}
+                </span>
+            </div>
 
             {/* Re-center Button - appears when user pans away during navigation */}
             {routeData && !isFollowMode && onFollowModeChange && (
                 <button
                     onClick={() => onFollowModeChange(true)}
-                    className="absolute bottom-16 right-4 z-10 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#00ff88] text-[#0a1628] font-semibold text-xs shadow-lg shadow-[#00d4ff]/30 flex items-center gap-2 active:scale-95 transition-transform"
+                    className="absolute right-4 z-10 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#00ff88] text-[#0a1628] font-semibold text-xs shadow-lg shadow-[#00d4ff]/30 flex items-center gap-2 active:scale-95 transition-all duration-300"
+                    style={{ bottom: bottomOffset + 64 }}
                 >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
@@ -575,12 +626,20 @@ const FloodMap = forwardRef(({
                 </button>
             )}
 
-            {/* Floating Info */}
-            <div className="absolute bottom-4 left-4 z-10 glass rounded-xl px-3 py-1.5">
-                <p className="text-[10px] text-slate-400">
-                    <span className="text-[#00d4ff] font-semibold">sanBaha</span> • Lipa City
-                </p>
+            {/* Weather Widget + Info */}
+            <div className="absolute left-4 z-10 transition-all duration-300"
+                style={{ bottom: bottomOffset + 16 }}>
+                <WeatherWidget onWeatherUpdate={onWeatherUpdate} />
             </div>
+
+            {/* Historical zones active badge */}
+            {showHistoricalData && isRaining && (
+                <div className="absolute left-4 z-10 glass rounded-lg px-2.5 py-1 flex items-center gap-1.5 transition-all duration-300"
+                    style={{ bottom: bottomOffset + 72 }}>
+                    <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                    <span className="text-[9px] text-purple-300 font-medium">🕐 Historical zones active in routing</span>
+                </div>
+            )}
         </div>
     );
 });
