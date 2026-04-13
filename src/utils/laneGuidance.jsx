@@ -9,7 +9,7 @@ export function LaneGuidance({ lanes }) {
   return (
     <div className="flex items-center gap-1 mb-1">
       {lanes.map((lane, i) => (
-        <LanePill key={i} lane={lane} />
+        <LanePill key={`${i}-${lane.indications?.[0] ?? 'none'}-${lane.valid}`} lane={lane} />
       ))}
     </div>
   );
@@ -17,7 +17,7 @@ export function LaneGuidance({ lanes }) {
 
 function LanePill({ lane }) {
   const indication = lane.indications?.[0] ?? 'straight';
-  const active = lane.valid;
+  const active = lane.valid ?? false;
 
   return (
     <div
