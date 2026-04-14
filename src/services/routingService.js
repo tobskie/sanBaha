@@ -1,4 +1,5 @@
 import * as turf from '@turf/turf';
+import { getAdjustedThresholds } from '../data/vehicles';
 
 // Mapbox access token (same as FloodMap)
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiYW50b25vbGltcG8iLCJhIjoiY21sZjYxdnNrMDFmbjNmcjVnZGFmZmlwaiJ9.p6iMH63mAesUTBbpoufwBw';
@@ -216,22 +217,37 @@ export async function getDirections(origin, destination, alternatives = true, wa
 
 /**
  * Create circular buffer polygons around flood points.
- * Includes flooded/warning sensors at 150m radius and clear sensors
- * with rain_mm >= RAIN_PRECAUTION_THRESHOLD at 100m radius (precautionary).
- * @param {Array} floodPoints - Array of flood hotspot objects
+ * When `vehicle` is provided, uses vehicle-adjusted thresholds to classify
+ * sensor status. Without `vehicle`, falls back to the global fixed thresholds.
+ *
+ * @param {Array} floodPoints - Array of flood hotspot objects with { status, waterLevel, rain_mm, coordinates }
+ * @param {Object|null} [vehicle=null] - Vehicle profile from PRESET_VEHICLES
  * @returns {Object} GeoJSON FeatureCollection of flood zones
  */
-export function createFloodZones(floodPoints) {
-    const relevantPoints = floodPoints.filter(p =>
-        p.status === 'flooded' ||
-        p.status === 'warning' ||
-        (p.status === 'clear' && (p.rain_mm ?? 0) >= RAIN_PRECAUTION_THRESHOLD)
-    );
+export function createFloodZones(floodPoints, vehicle = null) {
+    const getEffectiveStatus = (point) => {
+        if (!vehicle) return point.status;
+        const { passableMax, warningMax } = getAdjustedThresholds(vehicle);
+        const wl = point.waterLevel ?? 0;
+        if (wl < passableMax) return 'clear';
+        if (wl < warningMax) return 'warning';
+        return 'flooded';
+    };
+
+    const relevantPoints = floodPoints.filter(p => {
+        const effectiveStatus = getEffectiveStatus(p);
+        return (
+            effectiveStatus === 'flooded' ||
+            effectiveStatus === 'warning' ||
+            (effectiveStatus === 'clear' && (p.rain_mm ?? 0) >= RAIN_PRECAUTION_THRESHOLD)
+        );
+    });
 
     const features = relevantPoints.map(point => {
-        const zoneStatus = (point.status === 'clear' && (point.rain_mm ?? 0) >= RAIN_PRECAUTION_THRESHOLD)
+        const effectiveStatus = getEffectiveStatus(point);
+        const zoneStatus = (effectiveStatus === 'clear' && (point.rain_mm ?? 0) >= RAIN_PRECAUTION_THRESHOLD)
             ? 'precautionary'
-            : point.status;
+            : effectiveStatus;
 
         const radius = zoneStatus === 'precautionary' ? PRECAUTIONARY_BUFFER_RADIUS : FLOOD_BUFFER_RADIUS;
         const center = turf.point([point.coordinates[1], point.coordinates[0]]);
@@ -454,21 +470,18 @@ export function formatDistance(meters) {
  * @param {Array} origin - [longitude, latitude]
  * @param {Array} destination - [longitude, latitude]
  * @param {Array} floodPoints - Array of flood hotspot objects
+ * @param {Object|null} [vehicle=null] - Vehicle profile from PRESET_VEHICLES
  * @returns {Promise<Object>} Analyzed route data
  */
-export async function getSmartRoute(origin, destination, floodPoints) {
+export async function getSmartRoute(origin, destination, floodPoints, vehicle = null) {
     try {
-        // Get routes from Mapbox
         const directionsData = await getDirections(origin, destination, true);
 
         if (!directionsData.routes || directionsData.routes.length === 0) {
             throw new Error('No routes found');
         }
 
-        // Create flood zone polygons
-        const floodZones = createFloodZones(floodPoints);
-
-        // Analyze routes and find safest
+        const floodZones = createFloodZones(floodPoints, vehicle);   // ← pass vehicle
         const analysis = findSafestRoute(directionsData.routes, floodZones);
 
         return {
@@ -480,10 +493,7 @@ export async function getSmartRoute(origin, destination, floodPoints) {
         };
     } catch (error) {
         console.error('Smart routing error:', error);
-        return {
-            success: false,
-            error: error.message
-        };
+        return { success: false, error: error.message };
     }
 }
 
@@ -494,22 +504,18 @@ export async function getSmartRoute(origin, destination, floodPoints) {
  * @param {Array} origin - [longitude, latitude]
  * @param {Array} destination - [longitude, latitude]
  * @param {Array} floodPoints - Array of flood hotspot objects
+ * @param {Object|null} [vehicle=null] - Vehicle profile from PRESET_VEHICLES
  * @returns {Promise<Object>} { success, safeRoute, allRoutes, floodZones, warnings, unavoidable, origin, destination }
  */
-export async function getSmartRouteWithAvoidance(origin, destination, floodPoints) {
+export async function getSmartRouteWithAvoidance(origin, destination, floodPoints, vehicle = null) {
     try {
-        // Step 1: Initial fetch using existing smart route logic
-        const initial = await getSmartRoute(origin, destination, floodPoints);
+        const initial = await getSmartRoute(origin, destination, floodPoints, vehicle);  // ← pass vehicle
         if (!initial.success) return initial;
         if (!initial.safeRoute.isFlooded) return { ...initial, unavoidable: false };
 
-        // Step 2: Compute bypass waypoints for each crossed flood zone
-        // initial.safeRoute.geometry is a raw GeoJSON geometry (not a Feature wrapper)
-        // as set by findSafestRoute: `geometry: route.geometry`
         const bypassWaypoints = computeBypassWaypoints(initial.safeRoute, initial.floodZones);
         if (bypassWaypoints.length === 0) return { ...initial, unavoidable: true };
 
-        // Step 3: Retry with waypoints
         const retryData = await getDirections(origin, destination, true, bypassWaypoints);
         if (!retryData.routes || retryData.routes.length === 0) {
             return { ...initial, unavoidable: true };
