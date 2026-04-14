@@ -1,0 +1,147 @@
+<h2>Route Summary Card — Where should it live?</h2>
+<p class="subtitle">Currently it floats at <code>bottom-[290px]</code>, blocking the map center. Pick the layout that works best.</p>
+
+<div class="cards" style="grid-template-columns: repeat(3, 1fr); gap: 16px;">
+
+  <!-- Option A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a1628; padding:12px; display:flex; justify-content:center;">
+      <!-- Phone mockup A -->
+      <div style="width:110px; height:220px; background:#111e30; border-radius:16px; border:2px solid #334155; position:relative; overflow:hidden; display:flex; flex-direction:column;">
+        <!-- Header -->
+        <div style="background:#0f2035; padding:6px 8px; border-bottom:1px solid #1e3a5f; flex-shrink:0;">
+          <div style="width:50px; height:5px; background:#00d4ff; border-radius:3px; margin-bottom:2px;"></div>
+          <div style="width:30px; height:3px; background:#334155; border-radius:2px;"></div>
+        </div>
+        <!-- Map fills full height -->
+        <div style="flex:1; background:linear-gradient(180deg,#1a2f4a 0%,#162540 100%); position:relative;">
+          <!-- Route line -->
+          <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 110 170">
+            <path d="M55 20 Q80 80 55 150" stroke="#00d4ff" stroke-width="2.5" fill="none" stroke-dasharray="4 2"/>
+            <circle cx="55" cy="20" r="4" fill="#00d4ff"/>
+            <circle cx="55" cy="150" r="4" fill="#00ff88"/>
+          </svg>
+        </div>
+        <!-- Compact top bar (below header, above map edge) -->
+        <div style="position:absolute; top:30px; left:4px; right:4px; background:rgba(15,32,53,0.95); border:1px solid rgba(0,212,255,0.3); border-radius:8px; padding:5px 7px; display:flex; align-items:center; gap:5px; backdrop-filter:blur(8px);">
+          <div style="flex:1;">
+            <div style="font-size:6px; font-weight:700; color:white; white-space:nowrap; overflow:hidden;">SM City Lipa</div>
+            <div style="font-size:5px; color:#00ff88;">Safe route</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:7px; font-weight:700; color:#00d4ff;">34m</div>
+            <div style="font-size:5px; color:#94a3b8;">13.5km</div>
+          </div>
+          <div style="width:12px; height:12px; background:#162d4d; border-radius:3px; flex-shrink:0;"></div>
+        </div>
+        <!-- BottomSheet stub -->
+        <div style="background:#0f2035; padding:5px 8px; border-top:1px solid #1e3a5f; flex-shrink:0;">
+          <div style="width:25px; height:3px; background:#334155; border-radius:2px; margin:0 auto 3px;"></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:3px;">
+            <div style="height:16px; background:#162d4d; border-radius:3px;"></div>
+            <div style="height:16px; background:#162d4d; border-radius:3px;"></div>
+            <div style="height:16px; background:#162d4d; border-radius:3px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Top compact strip</h3>
+      <p>Slim bar docked below the header. Map is fully visible. Destination + ETA + distance + close button in one row.</p>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a1628; padding:12px; display:flex; justify-content:center;">
+      <!-- Phone mockup B -->
+      <div style="width:110px; height:220px; background:#111e30; border-radius:16px; border:2px solid #334155; position:relative; overflow:hidden; display:flex; flex-direction:column;">
+        <!-- Header -->
+        <div style="background:#0f2035; padding:6px 8px; border-bottom:1px solid #1e3a5f; flex-shrink:0;">
+          <div style="width:50px; height:5px; background:#00d4ff; border-radius:3px; margin-bottom:2px;"></div>
+          <div style="width:30px; height:3px; background:#334155; border-radius:2px;"></div>
+        </div>
+        <!-- Map fills most height -->
+        <div style="flex:1; background:linear-gradient(180deg,#1a2f4a 0%,#162540 100%); position:relative;">
+          <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 110 140">
+            <path d="M55 15 Q80 65 55 125" stroke="#00d4ff" stroke-width="2.5" fill="none" stroke-dasharray="4 2"/>
+            <circle cx="55" cy="15" r="4" fill="#00d4ff"/>
+            <circle cx="55" cy="125" r="4" fill="#00ff88"/>
+          </svg>
+        </div>
+        <!-- Route card docked on top of bottom sheet -->
+        <div style="background:rgba(15,32,53,0.97); border-top:1px solid rgba(0,212,255,0.2); padding:6px 8px; flex-shrink:0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+            <div>
+              <div style="font-size:6px; font-weight:700; color:white;">SM City Lipa</div>
+              <div style="font-size:5px; color:#00ff88;">Safe route</div>
+            </div>
+            <div style="width:10px; height:10px; background:#162d4d; border-radius:2px;"></div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:3px;">
+            <div style="background:#0a1628; border-radius:4px; padding:2px; text-align:center;">
+              <div style="font-size:7px; font-weight:700; color:#00d4ff;">34m</div>
+              <div style="font-size:4px; color:#64748b;">duration</div>
+            </div>
+            <div style="background:#0a1628; border-radius:4px; padding:2px; text-align:center;">
+              <div style="font-size:7px; font-weight:700; color:#00d4ff;">13.5k</div>
+              <div style="font-size:4px; color:#64748b;">distance</div>
+            </div>
+          </div>
+        </div>
+        <!-- BottomSheet stub (hidden/replaced) -->
+        <div style="background:#0a1221; padding:4px 8px; flex-shrink:0;">
+          <div style="width:25px; height:3px; background:#1e3a5f; border-radius:2px; margin:0 auto;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Bottom dock panel</h3>
+      <p>Route card sits at the bottom, replacing the BottomSheet drag handle. Map gets full upper area. ETA/distance in 2-col grid.</p>
+    </div>
+  </div>
+
+  <!-- Option C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a1628; padding:12px; display:flex; justify-content:center;">
+      <!-- Phone mockup C: Split — top strip for summary + bottom sheet unchanged -->
+      <div style="width:110px; height:220px; background:#111e30; border-radius:16px; border:2px solid #334155; position:relative; overflow:hidden; display:flex; flex-direction:column;">
+        <!-- Header -->
+        <div style="background:#0f2035; padding:6px 8px; border-bottom:1px solid #1e3a5f; flex-shrink:0;">
+          <div style="width:50px; height:5px; background:#00d4ff; border-radius:3px; margin-bottom:2px;"></div>
+          <div style="width:30px; height:3px; background:#334155; border-radius:2px;"></div>
+        </div>
+        <!-- Route bar -->
+        <div style="background:rgba(10,22,40,0.96); border-bottom:1px solid rgba(0,255,136,0.2); padding:4px 8px; display:flex; align-items:center; gap:4px; flex-shrink:0;">
+          <div style="w-2 h-2; width:6px; height:6px; background:#00ff88; border-radius:50%; flex-shrink:0;"></div>
+          <div style="flex:1; font-size:5.5px; color:white; font-weight:600;">SM City Lipa</div>
+          <div style="font-size:5.5px; color:#00d4ff; font-weight:700;">34m</div>
+          <div style="font-size:5px; color:#64748b; margin-left:2px;">13.5k</div>
+          <div style="width:10px; height:10px; background:#162d4d; border-radius:2px; flex-shrink:0;"></div>
+        </div>
+        <!-- Map fills full remaining height -->
+        <div style="flex:1; background:linear-gradient(180deg,#1a2f4a 0%,#162540 100%); position:relative;">
+          <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 110 130">
+            <path d="M55 15 Q80 65 55 115" stroke="#00d4ff" stroke-width="2.5" fill="none" stroke-dasharray="4 2"/>
+            <circle cx="55" cy="15" r="4" fill="#00d4ff"/>
+            <circle cx="55" cy="115" r="4" fill="#00ff88"/>
+          </svg>
+        </div>
+        <!-- BottomSheet stub UNCHANGED -->
+        <div style="background:#0f2035; padding:5px 8px; border-top:1px solid #1e3a5f; flex-shrink:0;">
+          <div style="width:25px; height:3px; background:#334155; border-radius:2px; margin:0 auto 3px;"></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:3px;">
+            <div style="height:16px; background:#162d4d; border-radius:3px;"></div>
+            <div style="height:16px; background:#162d4d; border-radius:3px;"></div>
+            <div style="height:16px; background:#162d4d; border-radius:3px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Thin header bar</h3>
+      <p>One-line strip directly below the app header. All map + BottomSheet stay untouched. Tap to expand for details.</p>
+    </div>
+  </div>
+
+</div>

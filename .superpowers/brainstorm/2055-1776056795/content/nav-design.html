@@ -1,0 +1,140 @@
+<h2>Navigation UI Design</h2>
+<p class="subtitle">Two states — collapsed banner and expanded step list</p>
+
+<div class="split">
+
+  <!-- Collapsed State -->
+  <div class="mockup">
+    <div class="mockup-header">Collapsed (default)</div>
+    <div class="mockup-body" style="background:#0a1628;padding:16px;display:flex;justify-content:center">
+      <div style="width:200px;background:#0d1f35;border-radius:18px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.6);font-family:sans-serif">
+
+        <div style="background:#0a1628;padding:4px 12px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:7px;color:#64748b">sanBaha</span>
+          <span style="font-size:7px;color:#00ff88">● Live</span>
+        </div>
+
+        <div style="background:linear-gradient(135deg,#162d4d,#0f2035);padding:10px 12px;border-bottom:1px solid #00d4ff22;cursor:pointer">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:36px;height:36px;background:#00d4ff18;border:1.5px solid #00d4ff44;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Turn right</div>
+              <div style="font-size:8px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">onto Rizal Ave · <span style="color:#00d4ff">200m</span></div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-size:11px;font-weight:700;color:#00ff88">8 min</div>
+              <div style="font-size:7px;color:#64748b">2.3 km</div>
+            </div>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+
+        <div style="height:110px;background:#111d2e;position:relative;display:flex;align-items:center;justify-content:center">
+          <div style="font-size:8px;color:#1e3a5f">[ Map — follow mode ]</div>
+          <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:#f59e0b22;border:1px solid #f59e0b44;border-radius:99px;padding:2px 8px;white-space:nowrap">
+            <span style="font-size:6px;color:#fbbf24">⚠ Flood zone ahead · 1.1 km</span>
+          </div>
+        </div>
+
+        <div style="background:#0d1f35;padding:6px 12px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #1e3a5f">
+          <span style="font-size:7px;color:#64748b">Navigating to <span style="color:#94a3b8">Mabini St</span></span>
+          <div style="background:#ff444422;border:1px solid #ff444444;border-radius:6px;padding:3px 7px;font-size:7px;color:#f87171">End</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expanded State -->
+  <div class="mockup">
+    <div class="mockup-header">Expanded (tapped banner)</div>
+    <div class="mockup-body" style="background:#0a1628;padding:16px;display:flex;justify-content:center">
+      <div style="width:200px;background:#0d1f35;border-radius:18px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.6);font-family:sans-serif">
+
+        <div style="background:#0a1628;padding:4px 12px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:7px;color:#64748b">sanBaha</span>
+          <span style="font-size:7px;color:#00ff88">● Live</span>
+        </div>
+
+        <div style="background:linear-gradient(135deg,#162d4d,#0f2035);padding:10px 12px;border-bottom:1px solid #00d4ff22">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:36px;height:36px;background:#00d4ff18;border:1.5px solid #00d4ff44;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:10px;font-weight:700;color:#fff">Turn right</div>
+              <div style="font-size:8px;color:#94a3b8">onto Rizal Ave · <span style="color:#00d4ff">200m</span></div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:11px;font-weight:700;color:#00ff88">8 min</div>
+              <div style="font-size:7px;color:#64748b">2.3 km</div>
+            </div>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>
+          </div>
+        </div>
+
+        <div style="background:#0d1f35;max-height:130px;overflow-y:auto">
+          <div style="padding:7px 12px;background:#00d4ff0a;border-left:2px solid #00d4ff;display:flex;align-items:center;gap:7px">
+            <div style="width:22px;height:22px;background:#00d4ff18;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:8px;font-weight:600;color:#fff">Turn right onto Rizal Ave</div>
+              <div style="font-size:7px;color:#00d4ff">200m — now</div>
+            </div>
+          </div>
+          <div style="padding:7px 12px;border-top:1px solid #1e3a5f22;display:flex;align-items:center;gap:7px">
+            <div style="width:22px;height:22px;background:#1e3a5f;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:8px;color:#94a3b8">Turn left onto Mabini St</div>
+              <div style="font-size:7px;color:#475569">650m</div>
+            </div>
+          </div>
+          <div style="padding:7px 12px;border-top:1px solid #1e3a5f22;display:flex;align-items:center;gap:7px">
+            <div style="width:22px;height:22px;background:#1e3a5f;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:8px;color:#94a3b8">Continue straight · 1.1 km</div>
+              <div style="font-size:7px;color:#f59e0b">⚠ Flood zone nearby</div>
+            </div>
+          </div>
+          <div style="padding:7px 12px;border-top:1px solid #1e3a5f22;display:flex;align-items:center;gap:7px">
+            <div style="width:22px;height:22px;background:#00ff8818;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5"><circle cx="12" cy="12" r="4"/></svg>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:8px;color:#00ff88">Arrive at destination</div>
+              <div style="font-size:7px;color:#475569">2.3 km total</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#0d1f35;padding:6px 12px;border-top:1px solid #1e3a5f;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:7px;color:#64748b">Navigating to <span style="color:#94a3b8">Mabini St</span></span>
+          <div style="background:#ff444422;border:1px solid #ff444444;border-radius:6px;padding:3px 7px;font-size:7px;color:#f87171">End</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:16px">
+  <h3>Does this look right?</h3>
+  <div class="options">
+    <div class="option" data-choice="yes" onclick="toggleSelect(this)">
+      <div class="letter">✓</div>
+      <div class="content"><h3>Yes — looks good</h3><p>Proceed with this design</p></div>
+    </div>
+    <div class="option" data-choice="tweak" onclick="toggleSelect(this)">
+      <div class="letter">~</div>
+      <div class="content"><h3>Almost — needs tweaks</h3><p>Let me describe what to change</p></div>
+    </div>
+  </div>
+</div>

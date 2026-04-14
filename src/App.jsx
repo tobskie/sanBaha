@@ -482,6 +482,7 @@ function App() {
           onWeatherUpdate={setWeatherData}
           showFloodZones={showFloodZones}
           bottomOffset={isBottomSheetExpanded ? Math.round(window.innerHeight * 0.7) : 210}
+          topOffset={currentStep ? 90 : 0}
           onError={(msg) => setToast({ message: msg, type: 'error' })}
         />
       </div>

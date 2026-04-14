@@ -41,14 +41,39 @@ export const submitFloodReport = (report) => {
   });
 };
 
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiYW50b25vbGltcG8iLCJhIjoiY21sZjYxdnNrMDFmbjNmcjVnZGFmZmlwaiJ9.p6iMH63mAesUTBbpoufwBw';
+
+// Cache to avoid re-fetching the same coordinates
+const geocodeCache = {};
+
+const reverseGeocode = async (lat, lng) => {
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+  if (geocodeCache[key]) return geocodeCache[key];
+
+  try {
+    const res = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=neighborhood,locality,place&limit=1&access_token=${MAPBOX_TOKEN}`
+    );
+    const json = await res.json();
+    const feature = json.features?.[0];
+    const result = feature
+      ? { name: feature.text, location: feature.place_name.split(',').slice(0, 3).join(',') }
+      : null;
+    geocodeCache[key] = result;
+    return result;
+  } catch {
+    return null;
+  }
+};
+
 // Real-time listener for flood sensor data
 export const subscribeToFloodData = (callback) => {
   const sensorsRef = ref(database, 'flood_sensors');
-  
-  const unsubscribe = onValue(sensorsRef, (snapshot) => {
+
+  const unsubscribe = onValue(sensorsRef, async (snapshot) => {
     const data = snapshot.val();
     if (data) {
-      const sensors = Object.keys(data).map(key => {
+      const sensors = await Promise.all(Object.keys(data).map(async key => {
         const item = data[key];
         let lat = item.latitude || item.lat;
         let lng = item.longitude || item.lng || item.long;
@@ -59,22 +84,28 @@ export const subscribeToFloodData = (callback) => {
           coords = [parseFloat(lat), parseFloat(lng)];
         } else if (!coords) {
           // Default fallback coordinates if none provided
-          coords = [13.9411, 121.1636]; 
+          coords = [13.9411, 121.1636];
         }
+
+        // Reverse-geocode the location name from sensor coordinates
+        const [sLat, sLng] = coords;
+        const geocoded = await reverseGeocode(sLat, sLng);
 
         return {
           id: key,
           ...item,
           coordinates: coords,
+          name: geocoded?.name || item.name || key,
+          location: geocoded?.location || item.location || 'Unknown location',
           status: getStatusFromWaterLevel(item.waterLevel)
         };
-      });
+      }));
       callback(sensors);
     } else {
       callback([]); // Handle empty database
     }
   });
-  
+
   return unsubscribe;
 };
 

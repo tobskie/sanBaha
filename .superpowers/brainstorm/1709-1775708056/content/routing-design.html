@@ -1,0 +1,128 @@
+<h2>Smart Routing — Waypoint Injection Design</h2>
+<p class="subtitle">How the algorithm detours around flood zones using turf.js geometry (no new dependencies needed)</p>
+
+<div class="split" style="gap:20px; align-items:flex-start;">
+
+  <!-- Before -->
+  <div class="mockup">
+    <div class="mockup-header" style="color:#ef4444;">❌ Current behavior</div>
+    <div class="mockup-body" style="background:#0a1628; padding:16px; display:flex; justify-content:center;">
+      <svg viewBox="0 0 200 260" width="200" height="260" style="font-family:monospace;">
+        <!-- Grid background -->
+        <defs>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e3a5f" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="200" height="260" fill="#111e30" rx="8"/>
+        <rect width="200" height="260" fill="url(#grid)" rx="8"/>
+
+        <!-- Origin -->
+        <circle cx="100" cy="20" r="6" fill="#00d4ff"/>
+        <text x="112" y="24" fill="#94a3b8" font-size="9">Origin</text>
+
+        <!-- Destination -->
+        <circle cx="100" cy="240" r="6" fill="#00ff88"/>
+        <text x="112" y="244" fill="#94a3b8" font-size="9">Destination</text>
+
+        <!-- Flood zone -->
+        <circle cx="100" cy="130" r="35" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4 2"/>
+        <text x="100" y="128" fill="#ef4444" font-size="8" text-anchor="middle">FLOOD</text>
+        <text x="100" y="139" fill="#ef4444" font-size="7" text-anchor="middle">ZONE</text>
+
+        <!-- Route going straight through flood zone (bad) -->
+        <path d="M100 26 L100 234" stroke="#ef4444" stroke-width="2.5" fill="none" stroke-dasharray="5 3" opacity="0.7"/>
+
+        <!-- Warning label -->
+        <rect x="20" y="105" width="120" height="14" rx="3" fill="rgba(239,68,68,0.2)" stroke="rgba(239,68,68,0.4)" stroke-width="1"/>
+        <text x="80" y="115" fill="#fca5a5" font-size="8" text-anchor="middle">⚠ Route crosses: Quiib</text>
+
+        <!-- Mapbox alternatives label -->
+        <text x="100" y="255" fill="#475569" font-size="7" text-anchor="middle">3 Mapbox alternatives — all flooded</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- After -->
+  <div class="mockup">
+    <div class="mockup-header" style="color:#00ff88;">✓ With waypoint injection</div>
+    <div class="mockup-body" style="background:#0a1628; padding:16px; display:flex; justify-content:center;">
+      <svg viewBox="0 0 200 260" width="200" height="260" style="font-family:monospace;">
+        <defs>
+          <pattern id="grid2" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e3a5f" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="200" height="260" fill="#111e30" rx="8"/>
+        <rect width="200" height="260" fill="url(#grid2)" rx="8"/>
+
+        <!-- Origin -->
+        <circle cx="100" cy="20" r="6" fill="#00d4ff"/>
+        <text x="112" y="24" fill="#94a3b8" font-size="9">Origin</text>
+
+        <!-- Destination -->
+        <circle cx="100" cy="240" r="6" fill="#00ff88"/>
+        <text x="112" y="244" fill="#94a3b8" font-size="9">Destination</text>
+
+        <!-- Flood zone -->
+        <circle cx="100" cy="130" r="35" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4 2"/>
+        <text x="100" y="128" fill="#ef4444" font-size="8" text-anchor="middle">FLOOD</text>
+        <text x="100" y="139" fill="#ef4444" font-size="7" text-anchor="middle">ZONE</text>
+
+        <!-- Ghost original route -->
+        <path d="M100 26 L100 234" stroke="#ef4444" stroke-width="1" fill="none" stroke-dasharray="3 4" opacity="0.3"/>
+
+        <!-- Bypass waypoint -->
+        <circle cx="155" cy="130" r="5" fill="#facc15" stroke="#fde68a" stroke-width="1.5"/>
+        <text x="163" y="134" fill="#fde68a" font-size="7">bypass</text>
+
+        <!-- New route going around -->
+        <path d="M100 26 Q120 80 155 130 Q140 185 100 234" stroke="#00d4ff" stroke-width="2.5" fill="none"/>
+
+        <!-- Arrow markers on route -->
+        <circle cx="131" cy="88" r="2.5" fill="#00d4ff"/>
+        <circle cx="148" cy="155" r="2.5" fill="#00d4ff"/>
+
+        <!-- Success label -->
+        <rect x="22" y="105" width="68" height="14" rx="3" fill="rgba(0,255,136,0.1)" stroke="rgba(0,255,136,0.3)" stroke-width="1"/>
+        <text x="56" y="115" fill="#6ee7b7" font-size="8" text-anchor="middle">✓ Safe route</text>
+
+        <!-- Steps label -->
+        <text x="100" y="255" fill="#475569" font-size="7" text-anchor="middle">Re-route via perpendicular offset point</text>
+      </svg>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:20px;">
+  <h3>Algorithm steps</h3>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px;">
+
+    <div style="background:rgba(0,212,255,0.05); border:1px solid rgba(0,212,255,0.15); border-radius:8px; padding:12px;">
+      <div class="label" style="color:#00d4ff; margin-bottom:8px;">Step 1 — Initial fetch</div>
+      <p style="font-size:12px; color:#94a3b8; margin:0;">Call Mapbox with <code>alternatives=true</code> (already done). Run <code>findSafestRoute</code>. If best route is dry → done, return it.</p>
+    </div>
+
+    <div style="background:rgba(250,204,21,0.05); border:1px solid rgba(250,204,21,0.2); border-radius:8px; padding:12px;">
+      <div class="label" style="color:#facc15; margin-bottom:8px;">Step 2 — Detect crossing</div>
+      <p style="font-size:12px; color:#94a3b8; margin:0;">If best route is flooded, get the flood zone polygons it crosses. For each, use <code>turf.nearestPointOnLine</code> + perpendicular bearing to compute a bypass waypoint ~300m from flood center.</p>
+    </div>
+
+    <div style="background:rgba(0,255,136,0.05); border:1px solid rgba(0,255,136,0.15); border-radius:8px; padding:12px;">
+      <div class="label" style="color:#00ff88; margin-bottom:8px;">Step 3 — Re-route</div>
+      <p style="font-size:12px; color:#94a3b8; margin:0;">Call Mapbox again with <code>[origin, bypassWaypoint, destination]</code>. Re-run <code>findSafestRoute</code>. One retry maximum.</p>
+    </div>
+
+    <div style="background:rgba(148,163,184,0.05); border:1px solid rgba(148,163,184,0.1); border-radius:8px; padding:12px;">
+      <div class="label" style="color:#94a3b8; margin-bottom:8px;">Step 4 — Fallback</div>
+      <p style="font-size:12px; color:#94a3b8; margin:0;">If still flooded after retry, return the route with <code>isFlooded: true</code> and a clear message: "Only available route crosses a flood zone."</p>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <h3>All turf.js — no new dependencies</h3>
+  <p style="color:#64748b; font-size:13px;">Uses <code>turf.nearestPointOnLine</code>, <code>turf.bearing</code>, and <code>turf.destination</code> — all already available since <code>@turf/turf</code> is imported in routingService.js.</p>
+</div>

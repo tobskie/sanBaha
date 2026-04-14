@@ -36,7 +36,7 @@ export default function NavigationBanner({
   const { type, modifier, instruction } = currentStep.maneuver;
 
   return (
-    <div className="absolute left-0 right-0 z-[1001] top-14">
+    <div className="absolute left-0 right-0 z-[1002] top-14">
       {/* Banner header — tappable */}
       <div
         data-testid="nav-banner-header"

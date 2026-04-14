@@ -190,6 +190,7 @@ const FloodMap = forwardRef(({
     isLocationAcquired = false,
     isFollowMode = false,
     bottomOffset = 0,
+    topOffset = 0,
     onFollowModeChange,
     onError
 }, ref) => {
@@ -476,7 +477,7 @@ const FloodMap = forwardRef(({
             </Map>
 
             {/* Compact Control Panel - Top Right */}
-            <div className="absolute top-4 right-3 z-10 flex flex-col gap-1.5">
+            <div className="absolute right-3 z-10 flex flex-col gap-1.5 transition-all duration-300" style={{ top: topOffset + 16 }}>
                 {/* Map Style Switcher - Horizontal */}
                 <div className="glass rounded-xl p-1 flex gap-0.5">
                     {Object.values(MAP_STYLES).map((style) => (
@@ -573,9 +574,9 @@ const FloodMap = forwardRef(({
                 </div>
             </div>
 
-            {/* Route Info Badge */}
-            {routeData?.safeRoute && (
-                <div className={`absolute top-4 left-14 z-10 rounded-xl px-3 py-2 ${routeData.safeRoute.isFlooded
+            {/* Route Info Badge — hidden while NavigationBanner is active (topOffset > 0) */}
+            {routeData?.safeRoute && topOffset === 0 && (
+                <div className={`absolute left-14 z-10 rounded-xl px-3 py-2 transition-all duration-300 ${routeData.safeRoute.isFlooded
                     ? 'bg-red-500/20 border border-red-500/30'
                     : 'bg-emerald-500/20 border border-emerald-500/30'
                     }`}>

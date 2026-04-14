@@ -15,9 +15,30 @@ vi.mock('../services/storage', () => ({
   })),
 }));
 
+vi.mock('firebase/app', () => ({
+  initializeApp: vi.fn(() => ({})),
+}));
+
 vi.mock('firebase/database', () => ({
+  getDatabase: vi.fn(() => ({})),
   ref: vi.fn(),
   update: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('firebase/auth', () => ({
+  getAuth: vi.fn(),
+  GoogleAuthProvider: vi.fn(),
+  signInWithPopup: vi.fn(),
+  signOut: vi.fn(),
+  onAuthStateChanged: vi.fn(),
+}));
+
+vi.mock('firebase/storage', () => ({
+  getStorage: vi.fn(),
+}));
+
+vi.mock('../data/mockData', () => ({
+  getStatusFromWaterLevel: vi.fn(),
 }));
 
 vi.mock('../services/firebase', () => ({ database: {} }));
