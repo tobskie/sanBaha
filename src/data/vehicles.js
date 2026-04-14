@@ -8,7 +8,7 @@ export const PRESET_VEHICLES = [
   { id: 'pickup',     name: 'Pickup',      groundClearanceCm: 28, toleranceLevel: 4 },
 ];
 
-export const DEFAULT_VEHICLE = PRESET_VEHICLES.find(v => v.id === 'sedan');
+export const DEFAULT_VEHICLE = Object.freeze({ ...PRESET_VEHICLES.find(v => v.id === 'sedan') });
 
 /**
  * Compute vehicle-adjusted flood tier thresholds in cm.
@@ -26,7 +26,7 @@ export function getAdjustedThresholds(vehicle) {
   }
   return {
     passableMax: clearance * 0.6,
-    warningMax:  clearance * 1.0,
+    warningMax:  clearance,
   };
 }
 
