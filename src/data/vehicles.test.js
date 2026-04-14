@@ -41,18 +41,28 @@ describe('getAdjustedThresholds', () => {
     const t = getAdjustedThresholds({ groundClearanceCm: 0 });
     const fallback = getAdjustedThresholds(DEFAULT_VEHICLE);
     expect(t.passableMax).toBeCloseTo(fallback.passableMax);
+    expect(t.warningMax).toBeCloseTo(fallback.warningMax);
   });
 
   it('falls back to sedan thresholds when clearance is negative', () => {
     const t = getAdjustedThresholds({ groundClearanceCm: -5 });
     const fallback = getAdjustedThresholds(DEFAULT_VEHICLE);
     expect(t.passableMax).toBeCloseTo(fallback.passableMax);
+    expect(t.warningMax).toBeCloseTo(fallback.warningMax);
   });
 
   it('falls back to sedan thresholds when vehicle is null', () => {
     const t = getAdjustedThresholds(null);
     const fallback = getAdjustedThresholds(DEFAULT_VEHICLE);
     expect(t.passableMax).toBeCloseTo(fallback.passableMax);
+    expect(t.warningMax).toBeCloseTo(fallback.warningMax);
+  });
+
+  it('falls back to sedan thresholds when clearance is Infinity', () => {
+    const t = getAdjustedThresholds({ groundClearanceCm: Infinity });
+    const fallback = getAdjustedThresholds(DEFAULT_VEHICLE);
+    expect(t.passableMax).toBeCloseTo(fallback.passableMax);
+    expect(t.warningMax).toBeCloseTo(fallback.warningMax);
   });
 });
 
