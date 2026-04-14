@@ -279,3 +279,56 @@ describe('getSmartRouteWithAvoidance', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });
+
+// ── vehicle-aware createFloodZones ────────────────────────────────────────
+
+vi.mock('../data/vehicles', () => ({
+  getAdjustedThresholds: vi.fn((vehicle) => {
+    if (vehicle?.id === 'sedan')  return { passableMax: 9,    warningMax: 15   };
+    if (vehicle?.id === 'pickup') return { passableMax: 16.8, warningMax: 28   };
+    return { passableMax: 9, warningMax: 15 }; // fallback to sedan
+  }),
+}));
+
+import { getAdjustedThresholds } from '../data/vehicles';
+
+describe('createFloodZones — vehicle-adjusted thresholds', () => {
+  const makePoint = (waterLevel, rain_mm = 0) => ({
+    id: 'p1',
+    name: 'Test Point',
+    status: 'clear',           // raw Firebase status — will be overridden by vehicle math
+    waterLevel,
+    rain_mm,
+    coordinates: [13.94, 121.15],
+  });
+
+  it('sedan: 20 cm sensor is flooded (above sedan warningMax of 15 cm)', async () => {
+    const { createFloodZones } = await import('./routingService.js');
+    const sedan = { id: 'sedan', groundClearanceCm: 15 };
+    const zones = createFloodZones([makePoint(20)], sedan);
+    expect(zones.features.length).toBe(1);
+    expect(zones.features[0].properties.status).toBe('flooded');
+  });
+
+  it('pickup: 20 cm sensor is warning (above pickup passableMax 16.8, below warningMax 28)', async () => {
+    const { createFloodZones } = await import('./routingService.js');
+    const pickup = { id: 'pickup', groundClearanceCm: 28 };
+    const zones = createFloodZones([makePoint(20)], pickup);
+    expect(zones.features[0].properties.status).toBe('warning');
+  });
+
+  it('pickup: 10 cm sensor is excluded (below pickup passableMax of 16.8 cm, no rain)', async () => {
+    const { createFloodZones } = await import('./routingService.js');
+    const pickup = { id: 'pickup', groundClearanceCm: 28 };
+    const zones = createFloodZones([makePoint(10)], pickup);
+    expect(zones.features.length).toBe(0);
+  });
+
+  it('no vehicle: uses original point.status (backwards compatible)', async () => {
+    const { createFloodZones } = await import('./routingService.js');
+    const flooded = { ...makePoint(80), status: 'flooded' };
+    const zones = createFloodZones([flooded]);   // no vehicle arg
+    expect(zones.features.length).toBe(1);
+    expect(zones.features[0].properties.status).toBe('flooded');
+  });
+});
