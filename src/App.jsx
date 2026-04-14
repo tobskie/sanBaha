@@ -17,6 +17,8 @@ import { useAuth } from './contexts/AuthContext';
 import { useAdmin } from './contexts/AdminContext';
 import { useUploadQueue } from './hooks/useUploadQueue';
 import { useReviewQueue } from './hooks/useReviewQueue';
+import useVehicleProfile from './hooks/useVehicleProfile';
+import { PRESET_VEHICLES } from './data/vehicles';
 import { ref as fRef, set as fSet } from 'firebase/database';
 import { database as db } from './services/firebase';
 import Toast from './components/Toast';
@@ -29,6 +31,7 @@ function App() {
   const { isAdmin } = useAdmin();
   const { enqueue: enqueueUpload } = useUploadQueue();
   const pendingReviewCount = useReviewQueue();
+  const { vehicle, setVehicle } = useVehicleProfile();
   const [toast, setToast] = useState(null);
   const [hotspots, setHotspots] = useState([]);
   const [selectedHotspot, setSelectedHotspot] = useState(null);
@@ -170,7 +173,7 @@ function App() {
 
   // Update flood zones when hotspots change
   useEffect(() => {
-    const zones = createFloodZones(hotspots);
+    const zones = createFloodZones(hotspots, vehicle);
     setFloodZones(zones);
   }, [hotspots]);
 
@@ -222,7 +225,8 @@ function App() {
       const result = await getSmartRouteWithAvoidance(
         newOrigin,
         destLocation.coordinates,
-        hotspots
+        hotspots,
+        vehicle
       );
       if (result.success) {
         setRouteData(result);
@@ -247,7 +251,7 @@ function App() {
   const handleNavigateWithCoords = async (origin, dest) => {
     setIsRouting(true);
     try {
-      const result = await getSmartRouteWithAvoidance(origin, dest, hotspots);
+      const result = await getSmartRouteWithAvoidance(origin, dest, hotspots, vehicle);
 
       if (result.success) {
         // If rain is active and historical data is enabled, merge historical
@@ -501,6 +505,7 @@ function App() {
           onClose={() => setShowNavigationPanel(false)}
           isRouting={isRouting}
           userLocation={userLocation}
+          vehicle={vehicle}
         />
       )}
 
@@ -730,6 +735,33 @@ function App() {
               </button>
             </div>
             <div className="p-4 space-y-4">
+              {/* Vehicle Profile */}
+              <div className="p-3 rounded-xl bg-[#162d4d]">
+                <p className="text-sm text-white mb-2">Your Vehicle</p>
+                <p className="text-[10px] text-slate-400 mb-3">Affects flood passability thresholds for routing</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {PRESET_VEHICLES.map(v => (
+                    <button
+                      key={v.id}
+                      onClick={async () => {
+                        try {
+                          await setVehicle(v);
+                        } catch {
+                          setToast({ type: 'error', message: "Couldn't save vehicle — try again" });
+                        }
+                      }}
+                      className={`p-2 rounded-lg text-left transition-all active:scale-95 border ${
+                        vehicle?.id === v.id
+                          ? 'border-[#00d4ff] bg-[#00d4ff]/10 text-white'
+                          : 'border-transparent bg-[#0d2137] text-slate-400'
+                      }`}
+                    >
+                      <p className="text-xs font-medium">{v.name}</p>
+                      <p className="text-[10px] text-slate-500">{v.groundClearanceCm} cm clearance</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="flex items-center justify-between p-3 rounded-xl bg-[#162d4d]">
                 <div>
                   <p className="text-sm text-white">Historical Flood Zones (5-Year)</p>
