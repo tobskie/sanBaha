@@ -1,0 +1,108 @@
+<h2>Navigation UI Layout</h2>
+<p class="subtitle">How should the turn-by-turn instructions appear while navigating?</p>
+
+<div class="cards">
+
+  <!-- Option A: Top Banner -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a1628;padding:12px;border-radius:8px">
+      <!-- Phone mockup -->
+      <div style="width:140px;margin:0 auto;background:#0d1f35;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
+        <!-- Top banner -->
+        <div style="background:#162d4d;padding:8px 10px;border-bottom:1px solid #00d4ff33">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="width:20px;height:20px;background:#00d4ff22;border-radius:4px;display:flex;align-items:center;justify-content:center">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+            <div>
+              <div style="font-size:7px;color:#fff;font-weight:700">Turn right</div>
+              <div style="font-size:6px;color:#00d4ff">in 200m · Rizal Ave</div>
+            </div>
+            <div style="margin-left:auto;font-size:7px;color:#94a3b8">8 min</div>
+          </div>
+        </div>
+        <!-- Map area -->
+        <div style="height:80px;background:#111d2e;display:flex;align-items:center;justify-content:center">
+          <div style="font-size:7px;color:#334155">[ Map ]</div>
+        </div>
+        <!-- Bottom strip -->
+        <div style="background:#0d1f35;padding:5px 8px;border-top:1px solid #1e3a5f;font-size:6px;color:#64748b">2.3 km remaining</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Top Banner</h3>
+      <p>Persistent header shows next maneuver + street name. Map stays full-screen. Clean and minimal — like Waze.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Bottom Card -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a1628;padding:12px;border-radius:8px">
+      <div style="width:140px;margin:0 auto;background:#0d1f35;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
+        <!-- Map area -->
+        <div style="height:75px;background:#111d2e;display:flex;align-items:center;justify-content:center">
+          <div style="font-size:7px;color:#334155">[ Map ]</div>
+        </div>
+        <!-- Bottom card -->
+        <div style="background:#162d4d;padding:8px 10px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+            <div style="width:24px;height:24px;background:#00d4ff22;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+            <div>
+              <div style="font-size:8px;color:#fff;font-weight:700">Turn right</div>
+              <div style="font-size:6px;color:#94a3b8">Rizal Ave · in 200m</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <div style="flex:1;background:#0d1f35;border-radius:4px;padding:4px;text-align:center">
+              <div style="font-size:8px;color:#00d4ff;font-weight:700">8 min</div>
+              <div style="font-size:5px;color:#64748b">ETA</div>
+            </div>
+            <div style="flex:1;background:#0d1f35;border-radius:4px;padding:4px;text-align:center">
+              <div style="font-size:8px;color:#fff;font-weight:700">2.3 km</div>
+              <div style="font-size:5px;color:#64748b">left</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Bottom Card</h3>
+      <p>Floating card at the bottom shows maneuver + ETA + distance. Map takes most of the screen.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Split -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a1628;padding:12px;border-radius:8px">
+      <div style="width:140px;margin:0 auto;background:#0d1f35;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
+        <!-- Top banner -->
+        <div style="background:#162d4d;padding:6px 10px;border-bottom:1px solid #00d4ff33">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="width:18px;height:18px;background:#00d4ff22;border-radius:4px;display:flex;align-items:center;justify-content:center">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+            <div style="font-size:7px;color:#fff;font-weight:700">Turn right in 200m</div>
+            <div style="margin-left:auto;font-size:6px;color:#00ff88">8 min</div>
+          </div>
+        </div>
+        <!-- Map area -->
+        <div style="height:60px;background:#111d2e;display:flex;align-items:center;justify-content:center">
+          <div style="font-size:7px;color:#334155">[ Map ]</div>
+        </div>
+        <!-- Steps list -->
+        <div style="background:#0d1f35;padding:5px 8px;border-top:1px solid #1e3a5f">
+          <div style="font-size:5px;color:#64748b;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">Next steps</div>
+          <div style="font-size:6px;color:#94a3b8;padding:2px 0;border-bottom:1px solid #1e3a5f22">↱ Turn right · Rizal Ave</div>
+          <div style="font-size:6px;color:#475569;padding:2px 0">↰ Turn left · Mabini St</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Banner + Step List</h3>
+      <p>Top banner for current step + compact step list below the map showing upcoming turns at a glance.</p>
+    </div>
+  </div>
+
+</div>

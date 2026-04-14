@@ -1,6 +1,7 @@
-const FloatingActions = ({ onNavigate, onReport, onRefresh, isRefreshing }) => {
+const FloatingActions = ({ onNavigate, onReport, onRefresh, isRefreshing, bottomOffset = 260 }) => {
     return (
-        <div className="absolute right-3 bottom-[280px] z-[1000] flex flex-col gap-2">
+        <div className="absolute right-3 z-[1000] flex flex-col gap-2 transition-all duration-300"
+            style={{ bottom: bottomOffset + 20 }}>
             {/* Report Flood Button */}
             <button
                 onClick={onReport}

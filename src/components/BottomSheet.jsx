@@ -12,7 +12,10 @@ const BottomSheet = ({
     isExpanded,
     onToggleExpand,
     isRouting,
-    userLocation
+    userLocation,
+    onReport,
+    onRefresh,
+    isRefreshing,
 }) => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [activeTab, setActiveTab] = useState('sensors');
@@ -33,9 +36,6 @@ const BottomSheet = ({
         warning: hotspots.filter(h => h.status === 'warning').length,
         flooded: hotspots.filter(h => h.status === 'flooded').length,
     };
-
-    // Check for flooded routes
-    const hasFloodedRoute = hotspots.some(h => h.status === 'flooded');
 
     // Touch handlers for swipe gesture
     const handleTouchStart = (e) => {
@@ -73,7 +73,7 @@ const BottomSheet = ({
         absolute left-0 right-0 bottom-0 z-[1001]
         glass rounded-t-3xl shadow-2xl
         transition-all duration-300 ease-out
-        ${isExpanded ? 'h-[70%]' : 'h-[260px]'}
+        ${isExpanded ? 'h-[70%]' : 'h-[210px]'}
       `}
         >
             {/* Drag Handle */}
@@ -89,30 +89,41 @@ const BottomSheet = ({
 
             {/* Header Section */}
             <div className="px-3 pb-2">
-                {/* Enhanced Destination Search */}
-                <div className="mb-2">
-                    <DestinationSearch
-                        onSelectDestination={onSelectDestination}
-                        onOpenNavigation={onOpenNavigation}
-                        isRouting={isRouting}
-                        userLocation={userLocation}
-                    />
-                </div>
+                {/* Action Row: Report | Search | Refresh */}
+                <div className="flex items-center gap-2 mb-2">
+                    {/* Report Flood */}
+                    <button
+                        onClick={onReport}
+                        className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 active:scale-95 transition-transform flex-shrink-0"
+                        title="Report flood"
+                    >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                    </button>
 
-                {/* Alternative Route Alert */}
-                {hasFloodedRoute && (
-                    <div className="mb-2 p-2.5 bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                            <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-xs font-medium text-amber-300">Flood areas detected</p>
-                            <p className="text-[10px] text-amber-200/70">Routes will avoid flooded zones</p>
-                        </div>
+                    {/* Search */}
+                    <div className="flex-1">
+                        <DestinationSearch
+                            onSelectDestination={onSelectDestination}
+                            onOpenNavigation={onOpenNavigation}
+                            isRouting={isRouting}
+                            userLocation={userLocation}
+                        />
                     </div>
-                )}
+
+                    {/* Refresh */}
+                    <button
+                        onClick={onRefresh}
+                        disabled={isRefreshing}
+                        className={`w-10 h-10 rounded-xl bg-[#162d4d] flex items-center justify-center text-[#00d4ff] active:scale-95 transition-all flex-shrink-0 ${isRefreshing ? 'opacity-50' : ''}`}
+                        title="Refresh data"
+                    >
+                        <svg className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                </div>
 
                 {/* Tab Navigation */}
                 <div className="flex gap-1.5 p-1 bg-[#0a1628] rounded-xl">

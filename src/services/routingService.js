@@ -8,6 +8,57 @@ const FLOOD_BUFFER_RADIUS = 0.15; // 150 meters
 export const RAIN_PRECAUTION_THRESHOLD = 25; // mm — moderate rainfall (25mm), road ponding likely
 const PRECAUTIONARY_BUFFER_RADIUS = 0.10; // 100m — smaller buffer for pre-emptive caution
 
+// ── Historical flood zone cache ─────────────────────────────────────────
+let historicalGeoJSONCache = null;
+
+/**
+ * Load UP NOAH historical flood GeoJSON (Batangas 5-year).
+ * Fetches once and caches in memory — the file is ~26 MB so we avoid
+ * re-fetching on every route calculation.
+ * @returns {Promise<Object|null>} GeoJSON FeatureCollection or null on error
+ */
+export async function loadHistoricalFloodZones() {
+    if (historicalGeoJSONCache) return historicalGeoJSONCache;
+
+    try {
+        const res = await fetch('/data/batangas_flood_5yr.geojson');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const geojson = await res.json();
+        historicalGeoJSONCache = geojson;
+        return geojson;
+    } catch (err) {
+        console.error('Failed to load historical flood zones:', err);
+        return null;
+    }
+}
+
+/**
+ * Merge historical flood polygons into the sensor-derived flood zones.
+ * Each historical feature gets `status: "historical"` so the scoring
+ * engine can apply a soft penalty.
+ *
+ * @param {Object} sensorFloodZones - FeatureCollection from createFloodZones()
+ * @param {Object} historicalGeoJSON - FeatureCollection from loadHistoricalFloodZones()
+ * @returns {Object} Merged GeoJSON FeatureCollection
+ */
+export function mergeHistoricalZones(sensorFloodZones, historicalGeoJSON) {
+    if (!historicalGeoJSON || !historicalGeoJSON.features) return sensorFloodZones;
+
+    const taggedHistorical = historicalGeoJSON.features.map((feature) => ({
+        ...feature,
+        properties: {
+            ...feature.properties,
+            status: 'historical',
+            name: feature.properties?.name || 'Historical Flood Zone',
+        },
+    }));
+
+    return turf.featureCollection([
+        ...(sensorFloodZones?.features || []),
+        ...taggedHistorical,
+    ]);
+}
+
 // Lipa City bounding box for geocoding bias
 const LIPA_BBOX = [121.05, 13.85, 121.25, 14.05];
 
@@ -323,10 +374,23 @@ export function findSafestRoute(routes, floodZones) {
 
         let floodPenalty = 0;
         if (intersection.intersects) {
-            const hasPrecautionaryOnly = intersection.intersectedZones.every(z => z.status === 'precautionary');
-            floodPenalty = hasPrecautionaryOnly
-                ? 500000
-                : 1000000 + (intersection.intersectedZones.length * 10000);
+            // Classify intersected zones by severity
+            const hasHardFlood = intersection.intersectedZones.some(
+                z => z.status !== 'precautionary' && z.status !== 'historical'
+            );
+            const hasPrecautionary = intersection.intersectedZones.some(z => z.status === 'precautionary');
+            const hasHistorical = intersection.intersectedZones.some(z => z.status === 'historical');
+
+            if (hasHardFlood) {
+                // Flooded / warning sensor — hard penalty
+                floodPenalty = 1000000 + (intersection.intersectedZones.length * 10000);
+            } else if (hasPrecautionary) {
+                // Sensor with heavy rain — moderate penalty
+                floodPenalty = 500000;
+            } else if (hasHistorical) {
+                // Historical flood zone during active rain — soft penalty
+                floodPenalty = 250000;
+            }
         }
 
         return {
@@ -335,7 +399,9 @@ export function findSafestRoute(routes, floodZones) {
             geometry: route.geometry,
             duration: route.duration,
             distance: route.distance,
-            isFlooded: intersection.intersects && intersection.intersectedZones.some(z => z.status !== 'precautionary'),
+            isFlooded: intersection.intersects && intersection.intersectedZones.some(
+                z => z.status !== 'precautionary' && z.status !== 'historical'
+            ),
             floodedZones: intersection.intersectedZones,
             score: floodPenalty + route.duration
         };
@@ -354,8 +420,9 @@ export function findSafestRoute(routes, floodZones) {
         safeRoute,
         allRoutes: analyzedRoutes,
         hasSafeRoute: safeRoutes.length > 0,
-        warnings: safeRoute.isFlooded ? safeRoute.floodedZones.filter(z => z.status !== 'precautionary') : [],
+        warnings: safeRoute.isFlooded ? safeRoute.floodedZones.filter(z => z.status !== 'precautionary' && z.status !== 'historical') : [],
         precautionaryWarnings,
+        historicalWarnings: safeRoute.floodedZones.filter(z => z.status === 'historical'),
     };
 }
 

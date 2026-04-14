@@ -1,0 +1,28 @@
+<h2>Mapbox Navigation — Which approach?</h2>
+<p class="subtitle">Pick the one that matches what you're going for</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Turn-by-turn UI (Directions API)</h3>
+      <p>Build a navigation overlay using the step data already being fetched from Mapbox Directions. Shows current maneuver, distance to next turn, step list, ETA. Voice guidance via browser TTS. Flood-aware routing stays intact.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>No new SDK or package</li><li>Full control over UI</li><li>Flood avoidance works as-is</li><li>Free tier friendly</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Must build step-tracking logic</li><li>No lane guidance</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Mapbox Navigation SDK (<code>mapbox-navigation-js</code>)</h3>
+      <p>Install the official Mapbox Navigation SDK. Embeds a full navigation widget with lane guidance, speed limits, rerouting, and polished UI. Closest to Google Maps / Waze experience.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Full-featured out of the box</li><li>Lane guidance & speed limits</li><li>Automatic rerouting</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Requires Navigation SDK license</li><li>Flood avoidance needs re-integration</li><li>Less UI customization</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
