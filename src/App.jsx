@@ -175,7 +175,7 @@ function App() {
   useEffect(() => {
     const zones = createFloodZones(hotspots, vehicle);
     setFloodZones(zones);
-  }, [hotspots]);
+  }, [hotspots, vehicle]);
 
   // Real-time flood data subscription (controlled by autoRefresh setting)
   useEffect(() => {
