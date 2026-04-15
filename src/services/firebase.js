@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, push, get, set as dbSet } from 'firebase/database';
+import { getDatabase, ref, onValue, push, get, set as dbSet, runTransaction } from 'firebase/database';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getStatusFromWaterLevel } from '../data/mockData';
@@ -146,9 +146,11 @@ export const submitVerification = async (reportId, userId) => {
   await dbSet(ref(database, userPath), true);
 
   const countRef = ref(database, `verifications/${reportId}/count`);
-  const countSnap = await get(countRef);
-  const newCount = (countSnap.val() || 0) + 1;
-  await dbSet(countRef, newCount);
+  let newCount;
+  await runTransaction(countRef, (current) => {
+    newCount = (current || 0) + 1;
+    return newCount;
+  });
 
   if (newCount >= 3) {
     await dbSet(ref(database, `verifications/${reportId}/verified`), true);
