@@ -117,3 +117,53 @@ export const hasMediaConsent = async (uid) => {
 
 export const setMediaConsent = (uid) =>
   dbSet(ref(database, `users/${uid}/mediaConsentGiven`), true);
+
+// ---------- Crowdsource Verification ----------
+
+/**
+ * Subscribe to real-time verification data for a report.
+ * Calls callback with { count, verified, users } whenever data changes.
+ * Returns an unsubscribe function.
+ */
+export const subscribeToVerification = (reportId, callback) => {
+  const verifRef = ref(database, `verifications/${reportId}`);
+  return onValue(verifRef, (snap) => {
+    const data = snap.val() || { count: 0, users: {}, verified: false };
+    callback(data);
+  });
+};
+
+/**
+ * Record one verification for userId on the given report.
+ * Throws Error('already_verified') if the user already verified this report.
+ * Returns { count, verified } after writing.
+ */
+export const submitVerification = async (reportId, userId) => {
+  const userPath = `verifications/${reportId}/users/${userId}`;
+  const existing = await get(ref(database, userPath));
+  if (existing.val()) throw new Error('already_verified');
+
+  await dbSet(ref(database, userPath), true);
+
+  const countRef = ref(database, `verifications/${reportId}/count`);
+  const countSnap = await get(countRef);
+  const newCount = (countSnap.val() || 0) + 1;
+  await dbSet(countRef, newCount);
+
+  if (newCount >= 3) {
+    await dbSet(ref(database, `verifications/${reportId}/verified`), true);
+  }
+
+  return { count: newCount, verified: newCount >= 3 };
+};
+
+/**
+ * Fetch media upload metadata for a report (one-time read).
+ * Returns { downloadURL, isVideo } if upload exists and has a URL, otherwise null.
+ */
+export const getReportMedia = async (reportId) => {
+  const snap = await get(ref(database, `media_uploads/${reportId}`));
+  const data = snap.val();
+  if (!data?.downloadURL) return null;
+  return { downloadURL: data.downloadURL, isVideo: data.isVideo || false };
+};
