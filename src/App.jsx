@@ -540,6 +540,7 @@ function App() {
           onClose={() => setSelectedHotspot(null)}
           onNavigate={() => handleNavigate(selectedHotspot)}
           isRouting={isRouting}
+          onError={(msg) => setToast({ message: msg, type: 'error' })}
         />
       )}
 
