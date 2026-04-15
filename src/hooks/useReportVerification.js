@@ -15,6 +15,10 @@ export default function useReportVerification(reportId) {
   // Real-time verification count subscription
   useEffect(() => {
     if (!reportId) return;
+    setHasVerified(false);
+    setCount(0);
+    setVerified(false);
+    setError(null);
     const unsubscribe = subscribeToVerification(reportId, (data) => {
       setCount(data.count || 0);
       setVerified(data.verified || false);
@@ -28,12 +32,15 @@ export default function useReportVerification(reportId) {
   // One-time media fetch on mount
   useEffect(() => {
     if (!reportId) return;
+    let cancelled = false;
     getReportMedia(reportId).then((media) => {
+      if (cancelled) return;
       if (media) {
         setMediaUrl(media.downloadURL);
         setIsVideo(media.isVideo);
       }
     });
+    return () => { cancelled = true; };
   }, [reportId]);
 
   const verify = useCallback(async () => {
@@ -51,7 +58,7 @@ export default function useReportVerification(reportId) {
     } finally {
       setSubmitting(false);
     }
-  }, [user, submitting, hasVerified, reportId]);
+  }, [user, hasVerified, reportId]);
 
   return { count, verified, hasVerified, mediaUrl, isVideo, submitting, error, verify };
 }
