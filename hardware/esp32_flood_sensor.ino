@@ -23,7 +23,7 @@ const char* password = "Ybots82505";
 #define US_SAMPLES        5       // pulses per measurement cycle
 #define US_SAMPLE_GAP_MS  5       // ms between pulses
 #define US_MIN_DIST_M     0.03f   // HC-SR04 blind zone (discard readings below this)
-#define EMA_ALPHA         0.2f    // EMA smoothing factor (0=no update, 1=no smoothing)     
+#define EMA_ALPHA         0.2f    // EMA smoothing factor (0=no update, 1=no smoothing)
 
 // --- Sensor Identity (edit these for your location) ---
 #define SENSOR_ID       "sensor_001"
@@ -48,7 +48,7 @@ FirebaseAuth auth;
 
 // EMA depth state
 float emaDepthM  = 0.0f;
-bool  emaSeeded  = false;   // true after the first valid reading seeds the EMA           
+bool  emaSeeded  = false;   // true after the first valid reading seeds the EMA
 
 // Rain Gauge Variables
 const float MM_PER_TIP = 0.2; // Typical value for tipping bucket, adjust if needed
