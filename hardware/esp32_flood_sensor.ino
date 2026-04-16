@@ -224,6 +224,10 @@ void loop() {
   }
   // If distanceM < 0 all 5 pulses timed out — retain last emaDepthM (no update)
 
+  // D. Rain (computed once here — reused by OLED and Firebase to avoid double ISR snapshot)
+  float currentRainMm = rollingRainMm();
+  float rain10Min     = rain10MinMm();
+
   // E. Update 0.96" OLED
   display.clearDisplay();
   display.setTextWrap(false);
@@ -247,7 +251,6 @@ void loop() {
   // Rain Display
   display.setCursor(5, 40);
   display.setTextSize(1);
-  float currentRainMm = rollingRainMm();
   display.print("Rain: ");
   display.print(currentRainMm, 1);
   display.print(" mm");
@@ -270,8 +273,7 @@ void loop() {
 
     // Convert depth from meters to centimeters for the web app
     float waterLevelCm = emaDepthM * 100.0;
-    float currentRainMm = rollingRainMm();
-    float rain10Min = rain10MinMm();
+    uint32_t nowEpoch  = (uint32_t)getEpochTime();  // capture once — consistent across all push targets
 
     // ── Push to /flood_sensors/sensor_001 (web app reads this) ──
     FirebaseJson sensorJson;
@@ -284,7 +286,7 @@ void loop() {
     sensorJson.set("lat", gps.location.lat());
     sensorJson.set("lng", gps.location.lng());
     sensorJson.set("rssi", WiFi.RSSI());
-    sensorJson.set("lastUpdate", (uint32_t)getEpochTime());
+    sensorJson.set("lastUpdate", nowEpoch);
 
     if (WiFi.status() == WL_CONNECTED) {
       // setJSON overwrites at a fixed path (sensor_001 always stays sensor_001)
@@ -294,7 +296,7 @@ void loop() {
 
     // ── Also keep the /logs push for historical logging ──
     FirebaseJson logJson;
-    logJson.set("timestamp", (uint32_t)getEpochTime());
+    logJson.set("timestamp", nowEpoch);
     logJson.set("depth_m", emaDepthM);
     logJson.set("rain_mm", currentRainMm);
     logJson.set("rain_10min", rain10Min);
@@ -311,7 +313,7 @@ void loop() {
     Serial.print(",\"waterLevel_cm\":"); Serial.print(waterLevelCm, 1);
     Serial.print(",\"rain_mm\":"); Serial.print(currentRainMm, 1);
     Serial.print(",\"rain_10min\":"); Serial.print(rain10Min, 1);
-    Serial.print(",\"ts\":"); Serial.print((uint32_t)getEpochTime());
+    Serial.print(",\"ts\":"); Serial.print(nowEpoch);
     Serial.print(",\"lat\":"); Serial.print(gps.location.lat(), 6);
     Serial.print(",\"lng\":"); Serial.print(gps.location.lng(), 6);
     Serial.println("}");
