@@ -148,10 +148,11 @@ float measureDistanceM() {
     delayMicroseconds(10);
     digitalWrite(TRIG_PIN, LOW);
 
+    // 30 000 µs timeout → ~5.2 m max range; well beyond the 1.5 m mount height
     long dur = pulseIn(ECHO_PIN, HIGH, 30000);
     if (dur > 0) {
       // distance_m = duration_µs * speed_m_per_s / 2_000_000
-      float d = (dur * SOUND_SPEED_MPS) / 2000000.0f;
+      float d = ((float)dur * SOUND_SPEED_MPS) / 2000000.0f;
       if (d >= US_MIN_DIST_M) {
         samples[validCount++] = d;
       }
