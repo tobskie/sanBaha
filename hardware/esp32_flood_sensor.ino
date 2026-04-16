@@ -135,6 +135,49 @@ void setup() {
   Firebase.reconnectWiFi(true);
 }
 
+// Takes US_SAMPLES ultrasonic pulses, sorts valid results, returns the
+// median distance in metres. Returns -1.0 if no valid echoes received.
+float measureDistanceM() {
+  float samples[US_SAMPLES];
+  int validCount = 0;
+
+  for (int i = 0; i < US_SAMPLES; i++) {
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
+
+    long dur = pulseIn(ECHO_PIN, HIGH, 30000);
+    if (dur > 0) {
+      // distance_m = duration_µs * speed_m_per_s / 2_000_000
+      float d = (dur * SOUND_SPEED_MPS) / 2000000.0f;
+      if (d >= US_MIN_DIST_M) {
+        samples[validCount++] = d;
+      }
+    }
+    if (i < US_SAMPLES - 1) delay(US_SAMPLE_GAP_MS);
+  }
+
+  if (validCount == 0) return -1.0f;   // all echoes invalid — caller retains last EMA
+
+  // Insertion sort (small N)
+  for (int i = 1; i < validCount; i++) {
+    float key = samples[i];
+    int j = i - 1;
+    while (j >= 0 && samples[j] > key) { samples[j + 1] = samples[j]; j--; }
+    samples[j + 1] = key;
+  }
+
+  // Average the middle values (drop min and max if 3+ samples)
+  if (validCount >= 3) {
+    float sum = 0;
+    for (int i = 1; i < validCount - 1; i++) sum += samples[i];
+    return sum / (validCount - 2);
+  }
+  return samples[validCount / 2];   // median of 1 or 2 valid samples
+}
+
 void loop() {
   // A. Process GPS
   while (SerialGPS.available() > 0) {
@@ -144,24 +187,15 @@ void loop() {
   // B. Hardware Status
   bool ppsStatus = digitalRead(PPS_PIN);
 
-  // C. Ultrasonic measurement in METERS
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-  
-  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
-  float distanceM = (duration * 0.0343) / 200.0; // cm to m
-  float currentDepthM = SENSOR_HEIGHT_M - distanceM;
-  if (currentDepthM < 0 || duration == 0) currentDepthM = 0;
-
-  // D. Rolling Average (Smooths out ripples)
-  total = total - readings[readIndex];
-  readings[readIndex] = currentDepthM;
-  total = total + readings[readIndex];
-  readIndex = (readIndex + 1) % numReadings;
-  averageDepthM = total / numReadings;
+  // C. Ultrasonic measurement — 5-sample median, EMA smoothed
+  float distanceM = measureDistanceM();
+  if (distanceM >= 0.0f) {
+    float depthM = SENSOR_HEIGHT_M - distanceM;
+    if (depthM < 0.0f) depthM = 0.0f;
+    if (!emaSeeded) { emaDepthM = depthM; emaSeeded = true; }
+    else            { emaDepthM = EMA_ALPHA * depthM + (1.0f - EMA_ALPHA) * emaDepthM; }
+  }
+  // If distanceM < 0 all 5 pulses timed out — retain last emaDepthM (no update)
 
   // E. Update 0.96" OLED
   display.clearDisplay();
@@ -179,8 +213,8 @@ void loop() {
   // Depth Display
   display.setCursor(5, 22);
   display.setTextSize(2);
-  display.print("D:"); 
-  display.print(averageDepthM, 2); 
+  display.print("D:");
+  display.print(emaDepthM, 2);
   display.print("m");
 
   // Rain Display
@@ -208,7 +242,7 @@ void loop() {
   if (millis() - lastPush > 5000) {
 
     // Convert depth from meters to centimeters for the web app
-    float waterLevelCm = averageDepthM * 100.0;
+    float waterLevelCm = emaDepthM * 100.0;
     float currentRainMm = rollingRainMm();
 
     // ── Push to /flood_sensors/sensor_001 (web app reads this) ──
@@ -216,7 +250,7 @@ void loop() {
     sensorJson.set("name", SENSOR_NAME);
     sensorJson.set("location", SENSOR_LOCATION);
     sensorJson.set("waterLevel", waterLevelCm);          // cm — web app thresholds: <25 clear, 25-70 warning, >70 flooded
-    sensorJson.set("depth_m", averageDepthM);             // keep original meters value too
+    sensorJson.set("depth_m", emaDepthM);             // keep original meters value too
     sensorJson.set("rain_mm", currentRainMm);
     sensorJson.set("lat", gps.location.lat());
     sensorJson.set("lng", gps.location.lng());
@@ -231,7 +265,7 @@ void loop() {
 
     // ── Also keep the /logs push for historical logging ──
     FirebaseJson logJson;
-    logJson.set("depth_m", averageDepthM);
+    logJson.set("depth_m", emaDepthM);
     logJson.set("rain_mm", currentRainMm);
     logJson.set("lat", gps.location.lat());
     logJson.set("lng", gps.location.lng());
@@ -242,7 +276,7 @@ void loop() {
     }
     
     // Serial JSON for local monitoring
-    Serial.print("{\"depth_m\":"); Serial.print(averageDepthM, 2);
+    Serial.print("{\"depth_m\":"); Serial.print(emaDepthM, 2);
     Serial.print(",\"waterLevel_cm\":"); Serial.print(waterLevelCm, 1);
     Serial.print(",\"rain_mm\":"); Serial.print(currentRainMm, 1);
     Serial.print(",\"lat\":"); Serial.print(gps.location.lat(), 6);
