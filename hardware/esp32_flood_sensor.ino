@@ -284,7 +284,7 @@ void loop() {
     sensorJson.set("lat", gps.location.lat());
     sensorJson.set("lng", gps.location.lng());
     sensorJson.set("rssi", WiFi.RSSI());
-    sensorJson.set("lastUpdate", (int)getEpochTime());
+    sensorJson.set("lastUpdate", (uint32_t)getEpochTime());
 
     if (WiFi.status() == WL_CONNECTED) {
       // setJSON overwrites at a fixed path (sensor_001 always stays sensor_001)
@@ -294,7 +294,7 @@ void loop() {
 
     // ── Also keep the /logs push for historical logging ──
     FirebaseJson logJson;
-    logJson.set("timestamp", (int)getEpochTime());
+    logJson.set("timestamp", (uint32_t)getEpochTime());
     logJson.set("depth_m", emaDepthM);
     logJson.set("rain_mm", currentRainMm);
     logJson.set("rain_10min", rain10Min);
@@ -311,7 +311,7 @@ void loop() {
     Serial.print(",\"waterLevel_cm\":"); Serial.print(waterLevelCm, 1);
     Serial.print(",\"rain_mm\":"); Serial.print(currentRainMm, 1);
     Serial.print(",\"rain_10min\":"); Serial.print(rain10Min, 1);
-    Serial.print(",\"ts\":"); Serial.print((int)getEpochTime());
+    Serial.print(",\"ts\":"); Serial.print((uint32_t)getEpochTime());
     Serial.print(",\"lat\":"); Serial.print(gps.location.lat(), 6);
     Serial.print(",\"lng\":"); Serial.print(gps.location.lng(), 6);
     Serial.println("}");
