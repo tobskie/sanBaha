@@ -71,25 +71,26 @@ void IRAM_ATTR countRain() {
   }
 }
 
-// Returns mm of rain in the last 60 minutes
-float rollingRainMm() {
-  // Snapshot volatile ISR state atomically to avoid torn reads
+// Returns mm of rain in the given rolling window.
+// Uses unsigned subtraction for millis() overflow safety — works correctly
+// even when millis() wraps around at ~49 days of uptime.
+float countTipsInWindow(unsigned long windowMs) {
   noInterrupts();
   int localCount = tipCount;
   unsigned long localTimestamps[MAX_TIPS];
   for (int i = 0; i < localCount; i++) localTimestamps[i] = tipTimestamps[i];
   interrupts();
 
-  // Guard against unsigned underflow during first hour of uptime
   unsigned long now = millis();
-  unsigned long cutoff = (now > 3600000UL) ? (now - 3600000UL) : 0;
-
   int count = 0;
   for (int i = 0; i < localCount; i++) {
-    if (localTimestamps[i] > cutoff) count++;
+    if ((now - localTimestamps[i]) <= windowMs) count++;
   }
   return count * MM_PER_TIP;
 }
+
+float rollingRainMm() { return countTipsInWindow(3600000UL); }  // last 60 minutes
+float rain10MinMm()   { return countTipsInWindow(600000UL);  }  // last 10 minutes
 
 void connectWiFi() {
   WiFi.begin(ssid, password);
