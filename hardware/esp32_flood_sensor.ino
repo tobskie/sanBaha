@@ -13,10 +13,17 @@ const char* password = "Ybots82505";
 #define FIREBASE_HOST "sanbaha-e05ae-default-rtdb.asia-southeast1.firebasedatabase.app" 
 #define FIREBASE_AUTH "5XCN927TVAwiHVlueWN7i3yaEujsExZ09mpUywTV"
 
-#define SENSOR_HEIGHT_M 1.50   // Height from ground in METERS
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define SCREEN_ADDRESS 0x3C     
+#define SENSOR_HEIGHT_M   1.50    // Height from ground in METERS
+#define SCREEN_WIDTH      128
+#define SCREEN_HEIGHT     64
+#define SCREEN_ADDRESS    0x3C
+
+// Ultrasonic accuracy constants
+#define SOUND_SPEED_MPS   349.5f  // m/s at ~30°C (Lipa City typical ambient)
+#define US_SAMPLES        5       // pulses per measurement cycle
+#define US_SAMPLE_GAP_MS  5       // ms between pulses
+#define US_MIN_DIST_M     0.03f   // HC-SR04 blind zone (discard readings below this)
+#define EMA_ALPHA         0.2f    // EMA smoothing factor (0=no update, 1=no smoothing)     
 
 // --- Sensor Identity (edit these for your location) ---
 #define SENSOR_ID       "sensor_001"
@@ -39,12 +46,9 @@ FirebaseData firebaseData;
 FirebaseConfig config;
 FirebaseAuth auth;
 
-// Smoothing (Rolling Average)
-const int numReadings = 10;
-float readings[numReadings];      
-int readIndex = 0;                
-float total = 0;                  
-float averageDepthM = 0;           
+// EMA depth state
+float emaDepthM  = 0.0f;
+bool  emaSeeded  = false;   // true after the first valid reading seeds the EMA           
 
 // Rain Gauge Variables
 const float MM_PER_TIP = 0.2; // Typical value for tipping bucket, adjust if needed
@@ -69,10 +73,20 @@ void IRAM_ATTR countRain() {
 
 // Returns mm of rain in the last 60 minutes
 float rollingRainMm() {
-  unsigned long cutoff = millis() - 3600000UL;
+  // Snapshot volatile ISR state atomically to avoid torn reads
+  noInterrupts();
+  int localCount = tipCount;
+  unsigned long localTimestamps[MAX_TIPS];
+  for (int i = 0; i < localCount; i++) localTimestamps[i] = tipTimestamps[i];
+  interrupts();
+
+  // Guard against unsigned underflow during first hour of uptime
+  unsigned long now = millis();
+  unsigned long cutoff = (now > 3600000UL) ? (now - 3600000UL) : 0;
+
   int count = 0;
-  for (int i = 0; i < tipCount; i++) {
-    if (tipTimestamps[i] > cutoff) count++;
+  for (int i = 0; i < localCount; i++) {
+    if (localTimestamps[i] > cutoff) count++;
   }
   return count * MM_PER_TIP;
 }
@@ -111,8 +125,6 @@ void setup() {
   // Rain Gauge Initialization
   pinMode(RAIN_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(RAIN_PIN), countRain, FALLING);
-
-  for (int i = 0; i < numReadings; i++) readings[i] = 0;
 
   connectWiFi();
 
