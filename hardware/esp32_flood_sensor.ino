@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <time.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -101,6 +102,27 @@ void connectWiFi() {
   }
 }
 
+// Sync time from NTP. UTC+8 = Philippine Standard Time (offset 28800s).
+// Waits up to 5s for initial sync. If WiFi is unavailable, returns immediately.
+void syncNTP() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  configTime(28800, 0, "pool.ntp.org", "time.google.com");
+  struct tm timeinfo;
+  int retry = 0;
+  while (!getLocalTime(&timeinfo) && retry < 10) {
+    delay(500);
+    retry++;
+  }
+}
+
+// Returns Unix epoch time (seconds since 1970-01-01 00:00:00 UTC).
+// Returns 0 if NTP has not synced yet — Firebase fields degrade gracefully.
+time_t getEpochTime() {
+  time_t now;
+  time(&now);
+  return now;
+}
+
 void setup() {
   Serial.begin(115200);
   
@@ -128,6 +150,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(RAIN_PIN), countRain, FALLING);
 
   connectWiFi();
+  syncNTP();
 
   // Firebase Initialization
   config.host = FIREBASE_HOST;
