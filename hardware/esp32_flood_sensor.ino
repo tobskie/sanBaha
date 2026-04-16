@@ -106,7 +106,7 @@ void connectWiFi() {
 // Waits up to 5s for initial sync. If WiFi is unavailable, returns immediately.
 void syncNTP() {
   if (WiFi.status() != WL_CONNECTED) return;
-  configTime(28800, 0, "pool.ntp.org", "time.google.com");
+  configTime(28800, 0, "pool.ntp.org", "time.google.com");  // 28800 = UTC+8, 0 = no DST (Philippines)
   struct tm timeinfo;
   int retry = 0;
   while (!getLocalTime(&timeinfo) && retry < 10) {
@@ -118,6 +118,8 @@ void syncNTP() {
 // Returns Unix epoch time (seconds since 1970-01-01 00:00:00 UTC).
 // Returns 0 if NTP has not synced yet — Firebase fields degrade gracefully.
 time_t getEpochTime() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) return 0;
   time_t now;
   time(&now);
   return now;
