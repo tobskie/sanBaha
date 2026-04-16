@@ -271,18 +271,20 @@ void loop() {
     // Convert depth from meters to centimeters for the web app
     float waterLevelCm = emaDepthM * 100.0;
     float currentRainMm = rollingRainMm();
+    float rain10Min = rain10MinMm();
 
     // ── Push to /flood_sensors/sensor_001 (web app reads this) ──
     FirebaseJson sensorJson;
     sensorJson.set("name", SENSOR_NAME);
     sensorJson.set("location", SENSOR_LOCATION);
-    sensorJson.set("waterLevel", waterLevelCm);          // cm — web app thresholds: <25 clear, 25-70 warning, >70 flooded
-    sensorJson.set("depth_m", emaDepthM);             // keep original meters value too
+    sensorJson.set("waterLevel", waterLevelCm);   // cm — thresholds: <25 clear, 25-70 warning, >70 flooded
+    sensorJson.set("depth_m", emaDepthM);
     sensorJson.set("rain_mm", currentRainMm);
+    sensorJson.set("rain_10min", rain10Min);
     sensorJson.set("lat", gps.location.lat());
     sensorJson.set("lng", gps.location.lng());
     sensorJson.set("rssi", WiFi.RSSI());
-    sensorJson.set("lastUpdate", millis());               // or use NTP if you add it later
+    sensorJson.set("lastUpdate", (int)getEpochTime());
 
     if (WiFi.status() == WL_CONNECTED) {
       // setJSON overwrites at a fixed path (sensor_001 always stays sensor_001)
@@ -292,8 +294,10 @@ void loop() {
 
     // ── Also keep the /logs push for historical logging ──
     FirebaseJson logJson;
+    logJson.set("timestamp", (int)getEpochTime());
     logJson.set("depth_m", emaDepthM);
     logJson.set("rain_mm", currentRainMm);
+    logJson.set("rain_10min", rain10Min);
     logJson.set("lat", gps.location.lat());
     logJson.set("lng", gps.location.lng());
     logJson.set("rssi", WiFi.RSSI());
@@ -306,6 +310,8 @@ void loop() {
     Serial.print("{\"depth_m\":"); Serial.print(emaDepthM, 2);
     Serial.print(",\"waterLevel_cm\":"); Serial.print(waterLevelCm, 1);
     Serial.print(",\"rain_mm\":"); Serial.print(currentRainMm, 1);
+    Serial.print(",\"rain_10min\":"); Serial.print(rain10Min, 1);
+    Serial.print(",\"ts\":"); Serial.print((int)getEpochTime());
     Serial.print(",\"lat\":"); Serial.print(gps.location.lat(), 6);
     Serial.print(",\"lng\":"); Serial.print(gps.location.lng(), 6);
     Serial.println("}");
