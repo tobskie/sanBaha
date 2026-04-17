@@ -69,7 +69,7 @@ function MediaRow({ id, item, onAccept, onReject }) {
 }
 
 export default function AdminDashboard() {
-  const { isAdmin } = useAdmin();
+  const { isAdmin, loading: roleLoading } = useAdmin();
   const { user } = useAuth();
   const [uploads, setUploads] = useState({});
   const [floodActive, setFloodActive] = useState(false);
@@ -85,6 +85,11 @@ export default function AdminDashboard() {
   }, []);
 
   if (!user) return <Navigate to="/" />;
+  if (roleLoading) return (
+    <div className="min-h-screen bg-[#0a1628] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
   if (!isAdmin) return (
     <div className="min-h-screen bg-[#0a1628] flex items-center justify-center">
       <p className="text-slate-400">Access denied. Admin role required.</p>
