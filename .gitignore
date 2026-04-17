@@ -16,7 +16,7 @@ dist-ssr
 .worktrees/
 
 # Hardware secrets — never commit real credentials
-hardware/secrets.h
+hardware/src/secrets.h
 
 # Editor directories and files
 .vscode/*
