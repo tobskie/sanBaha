@@ -30,11 +30,14 @@ const BottomSheet = ({
     const lastY = useRef(0);
     const lastTime = useRef(0);
     const velocity = useRef(0); // px/ms, positive = moving up
+    const sheetHeightRef = useRef(COLLAPSED_H); // mirrors sheetHeight for stale-closure-safe reads
 
     // Sync height when parent collapses/expands the sheet externally
     useEffect(() => {
         if (!isDragging) {
-            setSheetHeight(isExpanded ? expandedH() : COLLAPSED_H);
+            const h = isExpanded ? expandedH() : COLLAPSED_H;
+            sheetHeightRef.current = h;
+            setSheetHeight(h);
         }
     }, [isExpanded]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -69,6 +72,7 @@ const BottomSheet = ({
 
         const delta = dragStartY.current - y;
         const newH = Math.max(COLLAPSED_H, Math.min(expandedH(), dragStartHeight.current + delta));
+        sheetHeightRef.current = newH;
         setSheetHeight(newH);
     };
 
@@ -76,7 +80,7 @@ const BottomSheet = ({
         setIsDragging(false);
         const max = expandedH();
         const mid = (COLLAPSED_H + max) / 2;
-        if (velocity.current > 0.4 || sheetHeight > mid) {
+        if (velocity.current > 0.4 || sheetHeightRef.current > mid) {
             setSheetHeight(max);
             onToggleExpand(true);
         } else {
