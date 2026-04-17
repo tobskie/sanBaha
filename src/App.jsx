@@ -5,6 +5,7 @@ import FloodMap from './components/FloodMap';
 import BottomSheet from './components/BottomSheet';
 import MobileHeader from './components/MobileHeader';
 import HotspotDetail from './components/HotspotDetail';
+import HotspotMiniCard from './components/HotspotMiniCard';
 import NavigationPanel from './components/NavigationPanel';
 import ReportFloodPanel from './components/ReportFloodPanel';
 import HazardMapPanel from './components/HazardMapPanel';
@@ -37,6 +38,7 @@ function App() {
   const [crowdHotspots, setCrowdHotspots] = useState([]);
   const hotspots = useMemo(() => [...sensorHotspots, ...crowdHotspots], [sensorHotspots, crowdHotspots]);
   const [selectedHotspot, setSelectedHotspot] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
   const [destination, setDestination] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
@@ -218,6 +220,7 @@ function App() {
 
   const handleHotspotSelect = (hotspot) => {
     setSelectedHotspot(hotspot);
+    setShowDetail(false);
     if (isBottomSheetExpanded) {
       setIsBottomSheetExpanded(false);
     }
@@ -523,11 +526,20 @@ function App() {
         onEnd={handleStopNavigation}
       />
 
-      {/* Hotspot Detail Card (only show if no route and no nav panel) */}
-      {selectedHotspot && !routeData && !showNavigationPanel && (
+      {/* Hotspot mini-card — tap More Info to expand */}
+      {selectedHotspot && !routeData && !showNavigationPanel && !showDetail && (
+        <HotspotMiniCard
+          hotspot={selectedHotspot}
+          onMoreInfo={() => setShowDetail(true)}
+          onClose={() => setSelectedHotspot(null)}
+        />
+      )}
+
+      {/* Hotspot full detail — shown after tapping More Info */}
+      {selectedHotspot && !routeData && !showNavigationPanel && showDetail && (
         <HotspotDetail
           hotspot={selectedHotspot}
-          onClose={() => setSelectedHotspot(null)}
+          onClose={() => { setSelectedHotspot(null); setShowDetail(false); }}
           onNavigate={() => handleNavigate(selectedHotspot)}
           isRouting={isRouting}
           onError={(msg) => setToast({ message: msg, type: 'error' })}
