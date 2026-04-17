@@ -1,0 +1,33 @@
+{
+  "name": "sanBaha - Lipa City Flood Monitor",
+  "short_name": "sanBaha",
+  "description": "Real-time flood monitoring and smart navigation system for Lipa City, Batangas.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a1628",
+  "theme_color": "#0a1628",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["weather", "navigation", "utilities"],
+  "lang": "en",
+  "scope": "/"
+}
