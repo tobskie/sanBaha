@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import AdminDashboard from './components/AdminDashboard';
 import FloodMap from './components/FloodMap';
@@ -33,7 +33,9 @@ function App() {
   const pendingReviewCount = useReviewQueue();
   const { vehicle, setVehicle } = useVehicleProfile();
   const [toast, setToast] = useState(null);
-  const [hotspots, setHotspots] = useState([]);
+  const [sensorHotspots, setSensorHotspots] = useState([]);
+  const [crowdHotspots, setCrowdHotspots] = useState([]);
+  const hotspots = useMemo(() => [...sensorHotspots, ...crowdHotspots], [sensorHotspots, crowdHotspots]);
   const [selectedHotspot, setSelectedHotspot] = useState(null);
   const [destination, setDestination] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -53,8 +55,6 @@ function App() {
   const [destLocation, setDestLocation] = useState(null);
   const [isFollowMode, setIsFollowMode] = useState(false);
 
-  // Crowdsourcing state — sensor hotspots and crowd reports are merged into `hotspots`
-  const sensorHotspotsRef = useRef([]);
   const [showReportPanel, setShowReportPanel] = useState(false);
   const [showReviewQueue, setShowReviewQueue] = useState(false);
 
@@ -201,8 +201,7 @@ function App() {
         data.forEach((sensor) => {
           prevSensorStatusesRef.current[sensor.id] = sensor.status;
         });
-        sensorHotspotsRef.current = data;
-        setHotspots(data);
+        setSensorHotspots(data);
         setLastUpdate(new Date());
       }
     });
@@ -210,11 +209,9 @@ function App() {
     return () => unsubscribe();
   }, [autoRefresh, soundAlerts]);
 
-  // Real-time crowd reports — merged with sensor hotspots so all users see them
+  // Real-time crowd reports
   useEffect(() => {
-    const unsubscribe = subscribeToCrowdReports((reports) => {
-      setHotspots([...sensorHotspotsRef.current, ...reports]);
-    });
+    const unsubscribe = subscribeToCrowdReports(setCrowdHotspots);
     return () => unsubscribe();
   }, []);
 
