@@ -51,8 +51,7 @@ const BottomSheet = ({
         flooded: hotspots.filter(h => h.status === 'flooded').length,
     };
 
-    const handleTouchStart = (e) => {
-        const y = e.touches[0].clientY;
+    const startDrag = (y) => {
         dragStartY.current = y;
         dragStartHeight.current = sheetHeight;
         lastY.current = y;
@@ -61,24 +60,22 @@ const BottomSheet = ({
         setIsDragging(true);
     };
 
-    const handleTouchMove = (e) => {
-        const y = e.touches[0].clientY;
+    const moveDrag = (y) => {
         const now = Date.now();
         const dt = now - lastTime.current;
         if (dt > 0) velocity.current = (lastY.current - y) / dt;
         lastY.current = y;
         lastTime.current = now;
 
-        const delta = dragStartY.current - y; // positive = dragged up
+        const delta = dragStartY.current - y;
         const newH = Math.max(COLLAPSED_H, Math.min(expandedH(), dragStartHeight.current + delta));
         setSheetHeight(newH);
     };
 
-    const handleTouchEnd = () => {
+    const endDrag = () => {
         setIsDragging(false);
         const max = expandedH();
         const mid = (COLLAPSED_H + max) / 2;
-        // Flick up (velocity > 0.4 px/ms) or dragged past midpoint → expand
         if (velocity.current > 0.4 || sheetHeight > mid) {
             setSheetHeight(max);
             onToggleExpand(true);
@@ -87,6 +84,25 @@ const BottomSheet = ({
             onToggleExpand(false);
         }
         velocity.current = 0;
+    };
+
+    // Touch handlers
+    const handleTouchStart = (e) => startDrag(e.touches[0].clientY);
+    const handleTouchMove = (e) => moveDrag(e.touches[0].clientY);
+    const handleTouchEnd = endDrag;
+
+    // Mouse handlers (desktop)
+    const handleMouseDown = (e) => {
+        e.preventDefault();
+        startDrag(e.clientY);
+        const onMove = (ev) => moveDrag(ev.clientY);
+        const onUp = () => {
+            endDrag();
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
     };
 
 
@@ -107,6 +123,7 @@ const BottomSheet = ({
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
+                onMouseDown={handleMouseDown}
             >
                 <div className="w-10 h-1 bg-slate-500 rounded-full" />
             </div>
