@@ -411,7 +411,8 @@ function App() {
   const handleReportSubmit = async (report, mediaFile) => {
     try {
       await submitFloodReport(report);
-    } catch (_) {
+    } catch (err) {
+      console.error('submitFloodReport failed:', err);
       setToast({ message: 'Failed to save report. Please try again.', type: 'error' });
       return;
     }
@@ -851,13 +852,18 @@ function App() {
                 <p className="text-xs text-slate-400">
                   Navigate safely through Lipa City with real-time flood monitoring and smart routing that avoids flooded areas.
                 </p>
+                <div className="text-xs text-slate-400 py-2">
+                  <p className="font-semibold text-white mb-1">Founders:</p>
+                  <p>Raven Belen, Jacov Endaya</p>
+                  <p>Kurt Panganiban, Toby Olimpo</p>
+                </div>
                 <p className="text-xs text-slate-500">
                   Version 1.0.0 • Made with 💙 for Lipa City
                 </p>
               </div>
               <div className="pt-2 border-t border-[#00d4ff]/10">
                 <p className="text-[10px] text-slate-500 text-center">
-                  © 2024 sanBaha Team. All rights reserved.
+                  © 2026 sanBaha Team. All rights reserved.
                 </p>
               </div>
             </div>
