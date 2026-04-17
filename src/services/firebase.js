@@ -41,6 +41,32 @@ export const submitFloodReport = (report) => {
   });
 };
 
+// Real-time listener for crowdsourced flood reports.
+// Fires immediately on subscribe and on every new/changed report.
+// Returns unsubscribe function.
+export const subscribeToCrowdReports = (callback) => {
+  const reportsRef = ref(database, 'crowd_reports');
+  return onValue(reportsRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) { callback([]); return; }
+    const reports = Object.entries(data).map(([key, item]) => ({
+      id: item.id || key,
+      name: (item.locationName || 'User Report').split(',')[0].trim(),
+      location: item.locationName || 'Unknown Location',
+      coordinates: item.coordinates || [0, 0],
+      waterLevel: item.severity === 'flooded' ? 80 : item.severity === 'warning' ? 50 : 10,
+      status: item.severity || 'warning',
+      lastUpdate: item.reportedAt || item.submittedAt,
+      type: 'crowdsourced',
+      verified: item.verified || false,
+      reporterId: item.reporterId,
+      description: item.description,
+    }));
+    // Only surface warning/flooded reports on the map — clear reports are informational
+    callback(reports.filter(r => r.status !== 'clear'));
+  });
+};
+
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiYW50b25vbGltcG8iLCJhIjoiY21sZjYxdnNrMDFmbjNmcjVnZGFmZmlwaiJ9.p6iMH63mAesUTBbpoufwBw';
 
 // Cache to avoid re-fetching the same coordinates

@@ -11,7 +11,7 @@ import HazardMapPanel from './components/HazardMapPanel';
 import LoginPrompt from './components/LoginPrompt';
 import { getStatusFromWaterLevel } from './data/mockData';
 import { getSmartRouteWithAvoidance, createFloodZones, checkRouteIntersection, loadHistoricalFloodZones, mergeHistoricalZones, findSafestRoute } from './services/routingService';
-import { subscribeToFloodData, submitFloodReport } from './services/firebase';
+import { subscribeToFloodData, submitFloodReport, subscribeToCrowdReports } from './services/firebase';
 import { isRainfallActive } from './services/weatherService';
 import { useAuth } from './contexts/AuthContext';
 import { useAdmin } from './contexts/AdminContext';
@@ -53,8 +53,8 @@ function App() {
   const [destLocation, setDestLocation] = useState(null);
   const [isFollowMode, setIsFollowMode] = useState(false);
 
-  // Crowdsourcing state
-  const [crowdsourcedReports, setCrowdsourcedReports] = useState([]);
+  // Crowdsourcing state — sensor hotspots and crowd reports are merged into `hotspots`
+  const sensorHotspotsRef = useRef([]);
   const [showReportPanel, setShowReportPanel] = useState(false);
   const [showReviewQueue, setShowReviewQueue] = useState(false);
 
@@ -183,7 +183,6 @@ function App() {
 
     const unsubscribe = subscribeToFloodData((data) => {
       if (data && data.length > 0) {
-        // Detect new flooded sensors for sound alerts
         if (soundAlerts) {
           data.forEach((sensor) => {
             const prevStatus = prevSensorStatusesRef.current[sensor.id];
@@ -199,10 +198,10 @@ function App() {
             }
           });
         }
-        // Update tracked statuses
         data.forEach((sensor) => {
           prevSensorStatusesRef.current[sensor.id] = sensor.status;
         });
+        sensorHotspotsRef.current = data;
         setHotspots(data);
         setLastUpdate(new Date());
       }
@@ -210,6 +209,14 @@ function App() {
 
     return () => unsubscribe();
   }, [autoRefresh, soundAlerts]);
+
+  // Real-time crowd reports — merged with sensor hotspots so all users see them
+  useEffect(() => {
+    const unsubscribe = subscribeToCrowdReports((reports) => {
+      setHotspots([...sensorHotspotsRef.current, ...reports]);
+    });
+    return () => unsubscribe();
+  }, []);
 
 
   const handleHotspotSelect = (hotspot) => {
@@ -433,23 +440,8 @@ function App() {
       await enqueueUpload(report.id, mediaFile);
     }
 
-    setCrowdsourcedReports(prev => [...prev, report]);
+    // No manual hotspot push needed — subscribeToCrowdReports fires automatically
     setToast({ message: 'Flood report submitted!', type: 'success' });
-
-    if (report.severity === 'warning' || report.severity === 'flooded') {
-      const newHotspot = {
-        id: report.id,
-        name: report.locationName.split(',')[0] || 'User Report',
-        location: report.locationName,
-        coordinates: report.coordinates,
-        waterLevel: report.severity === 'flooded' ? 80 : 50,
-        status: report.severity,
-        lastUpdate: report.reportedAt,
-        type: 'crowdsourced',
-        verified: false,
-      };
-      setHotspots(prev => [...prev, newHotspot]);
-    }
   };
 
   return (
