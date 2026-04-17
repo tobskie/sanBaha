@@ -1,16 +1,7 @@
-import { useState, useEffect } from 'react';
 import { getStatusDetails } from '../data/mockData';
 
 const SensorCard = ({ sensor, isSelected, onClick }) => {
-    const [isAnimating, setIsAnimating] = useState(false);
     const statusDetails = getStatusDetails(sensor.status);
-
-    // Animate when water level changes
-    useEffect(() => {
-        setIsAnimating(true);
-        const timer = setTimeout(() => setIsAnimating(false), 500);
-        return () => clearTimeout(timer);
-    }, [sensor.waterLevel]);
 
     const getStatusIcon = () => {
         switch (sensor.status) {
@@ -64,11 +55,12 @@ const SensorCard = ({ sensor, isSelected, onClick }) => {
         <div
             onClick={onClick}
             className={`
-        glass-card rounded-xl p-4 cursor-pointer transition-smooth
-        hover:scale-[1.02] hover:border-[#00d4ff]/30
+        glass-card rounded-xl p-4 cursor-pointer
+        transition-colors duration-200
+        hover:bg-[#1e3a5f]/60 hover:border-[#00d4ff]/30
+        active:bg-[#1e3a5f]/80
         ${isSelected ? 'ring-2 ring-[#00d4ff] border-[#00d4ff]/50' : ''}
-        ${sensor.status === 'flooded' ? 'pulse-alert' : ''}
-        ${isAnimating ? 'scale-[1.02]' : ''}
+        ${sensor.status === 'flooded' ? 'border-red-500/30' : ''}
       `}
         >
             {/* Header */}

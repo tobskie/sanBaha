@@ -122,7 +122,9 @@ const BottomSheet = ({
         >
             {/* Drag Handle */}
             <div
-                className="flex justify-center py-2.5 cursor-grab active:cursor-grabbing touch-none select-none"
+                className="flex justify-center items-center py-4 cursor-grab active:cursor-grabbing touch-none select-none min-h-[44px]"
+                role="button"
+                aria-label="Drag to expand or collapse"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}

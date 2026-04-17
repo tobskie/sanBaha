@@ -312,6 +312,17 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Respect user's reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Fix for iOS notch */
 @supports (padding-top: env(safe-area-inset-top)) {
   .safe-area-top {

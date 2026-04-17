@@ -52,7 +52,8 @@ const MobileHeader = ({ lastUpdate, onMenuClick, onNavigateClick, isAdmin = fals
                         {/* Navigate Button */}
                         <button
                             onClick={onNavigateClick}
-                            className="w-9 h-9 rounded-xl bg-gradient-to-r from-[#00d4ff]/20 to-[#00ff88]/20 border border-[#00d4ff]/30 flex items-center justify-center text-[#00d4ff] active:scale-95 transition-transform"
+                            aria-label="Open navigation"
+                            className="w-9 h-9 rounded-xl bg-gradient-to-r from-[#00d4ff]/20 to-[#00ff88]/20 border border-[#00d4ff]/30 flex items-center justify-center text-[#00d4ff] active:scale-95 transition-colors duration-150"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -63,7 +64,8 @@ const MobileHeader = ({ lastUpdate, onMenuClick, onNavigateClick, isAdmin = fals
                         <div className="relative">
                             <button
                                 onClick={onMenuClick}
-                                className="w-9 h-9 rounded-xl bg-[#162d4d] flex items-center justify-center text-slate-300 active:scale-95 transition-transform"
+                                aria-label="Open menu"
+                                className="w-9 h-9 rounded-xl bg-[#162d4d] flex items-center justify-center text-slate-300 active:scale-95 transition-colors duration-150"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
