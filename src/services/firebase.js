@@ -41,29 +41,40 @@ export const submitFloodReport = (report) => {
   });
 };
 
+const EXPIRY_UNVERIFIED_MS = 6  * 60 * 60 * 1000; // 6 hours
+const EXPIRY_VERIFIED_MS   = 24 * 60 * 60 * 1000; // 24 hours
+
 // Real-time listener for crowdsourced flood reports.
 // Fires immediately on subscribe and on every new/changed report.
+// Reports are filtered client-side: unverified expire after 6 h, verified after 24 h.
 // Returns unsubscribe function.
 export const subscribeToCrowdReports = (callback) => {
   const reportsRef = ref(database, 'crowd_reports');
   return onValue(reportsRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) { callback([]); return; }
-    const reports = Object.entries(data).map(([key, item]) => ({
-      id: item.id || key,
-      name: (item.locationName || 'User Report').split(',')[0].trim(),
-      location: item.locationName || 'Unknown Location',
-      coordinates: item.coordinates || [0, 0],
-      waterLevel: item.severity === 'flooded' ? 80 : item.severity === 'warning' ? 50 : 10,
-      status: item.severity || 'warning',
-      lastUpdate: item.reportedAt || item.submittedAt,
-      type: 'crowdsourced',
-      verified: item.verified || false,
-      reporterId: item.reporterId,
-      description: item.description,
-    }));
-    // Only surface warning/flooded reports on the map — clear reports are informational
-    callback(reports.filter(r => r.status !== 'clear'));
+    const now = Date.now();
+    const reports = Object.entries(data)
+      .map(([key, item]) => ({
+        id: item.id || key,
+        name: (item.locationName || 'User Report').split(',')[0].trim(),
+        location: item.locationName || 'Unknown Location',
+        coordinates: item.coordinates || [0, 0],
+        waterLevel: item.severity === 'flooded' ? 80 : item.severity === 'warning' ? 50 : 10,
+        status: item.severity || 'warning',
+        lastUpdate: item.reportedAt || item.submittedAt,
+        type: 'crowdsourced',
+        verified: item.verified || false,
+        reporterId: item.reporterId,
+        description: item.description,
+      }))
+      .filter(r => {
+        if (r.status === 'clear') return false;
+        const age = now - new Date(r.lastUpdate).getTime();
+        const ttl = r.verified ? EXPIRY_VERIFIED_MS : EXPIRY_UNVERIFIED_MS;
+        return age < ttl;
+      });
+    callback(reports);
   });
 };
 
