@@ -26,7 +26,7 @@ const MobileHeader = ({ lastUpdate, onMenuClick, onNavigateClick, isAdmin = fals
     };
 
     return (
-        <header className="absolute top-0 left-0 right-0 z-[1002]">
+        <header className="absolute top-0 left-0 right-0 z-[1002]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
             <div className="glass border-b border-[#00d4ff]/10">
                 <div className="flex items-center justify-between px-4 py-3">
                     {/* Logo */}

@@ -75,6 +75,7 @@ const BottomSheet = ({
         transition-all duration-300 ease-out
         ${isExpanded ? 'h-[70%]' : 'h-[210px]'}
       `}
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
             {/* Drag Handle */}
             <div

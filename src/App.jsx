@@ -468,7 +468,7 @@ function App() {
       />
 
       {/* Map Container */}
-      <div className="absolute inset-0 pt-16">
+      <div className="absolute inset-0" style={{ paddingTop: 'calc(4rem + env(safe-area-inset-top))' }}>
         <FloodMap
           ref={mapRef}
           hotspots={hotspots}
@@ -695,7 +695,7 @@ function App() {
                 About sanBaha
               </button>
             </div>
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#00d4ff]/10">
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#00d4ff]/10" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
               {user ? (
                 <button
                   onClick={() => { setIsMobileMenuOpen(false); logout(); }}
