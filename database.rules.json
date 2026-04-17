@@ -5,7 +5,7 @@
       ".write": false
     },
     "crowd_reports": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": true
     },
     "media_uploads": {
