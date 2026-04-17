@@ -1,6 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import SensorCard from './SensorCard';
 import DestinationSearch from './DestinationSearch';
+
+const COLLAPSED_H = 210;
+const expandedH = () => Math.round(window.innerHeight * 0.7);
 
 const BottomSheet = ({
     hotspots,
@@ -19,10 +22,21 @@ const BottomSheet = ({
 }) => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [activeTab, setActiveTab] = useState('sensors');
-    const sheetRef = useRef(null);
-    const [startY, setStartY] = useState(0);
-    const [currentY, setCurrentY] = useState(0);
+    const [sheetHeight, setSheetHeight] = useState(COLLAPSED_H);
     const [isDragging, setIsDragging] = useState(false);
+
+    const dragStartY = useRef(0);
+    const dragStartHeight = useRef(0);
+    const lastY = useRef(0);
+    const lastTime = useRef(0);
+    const velocity = useRef(0); // px/ms, positive = moving up
+
+    // Sync height when parent collapses/expands the sheet externally
+    useEffect(() => {
+        if (!isDragging) {
+            setSheetHeight(isExpanded ? expandedH() : COLLAPSED_H);
+        }
+    }, [isExpanded]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Filter hotspots
     const filteredHotspots = hotspots.filter(hotspot =>
@@ -37,53 +51,62 @@ const BottomSheet = ({
         flooded: hotspots.filter(h => h.status === 'flooded').length,
     };
 
-    // Touch handlers for swipe gesture
     const handleTouchStart = (e) => {
-        setStartY(e.touches[0].clientY);
+        const y = e.touches[0].clientY;
+        dragStartY.current = y;
+        dragStartHeight.current = sheetHeight;
+        lastY.current = y;
+        lastTime.current = Date.now();
+        velocity.current = 0;
         setIsDragging(true);
     };
 
     const handleTouchMove = (e) => {
-        if (!isDragging) return;
-        setCurrentY(e.touches[0].clientY);
+        const y = e.touches[0].clientY;
+        const now = Date.now();
+        const dt = now - lastTime.current;
+        if (dt > 0) velocity.current = (lastY.current - y) / dt;
+        lastY.current = y;
+        lastTime.current = now;
+
+        const delta = dragStartY.current - y; // positive = dragged up
+        const newH = Math.max(COLLAPSED_H, Math.min(expandedH(), dragStartHeight.current + delta));
+        setSheetHeight(newH);
     };
 
     const handleTouchEnd = () => {
-        if (!isDragging) return;
-        const diff = currentY - startY;
-
-        if (Math.abs(diff) > 50) {
-            if (diff > 0 && isExpanded) {
-                onToggleExpand(false);
-            } else if (diff < 0 && !isExpanded) {
-                onToggleExpand(true);
-            }
-        }
-
         setIsDragging(false);
-        setStartY(0);
-        setCurrentY(0);
+        const max = expandedH();
+        const mid = (COLLAPSED_H + max) / 2;
+        // Flick up (velocity > 0.4 px/ms) or dragged past midpoint → expand
+        if (velocity.current > 0.4 || sheetHeight > mid) {
+            setSheetHeight(max);
+            onToggleExpand(true);
+        } else {
+            setSheetHeight(COLLAPSED_H);
+            onToggleExpand(false);
+        }
+        velocity.current = 0;
     };
 
 
+    const showContent = sheetHeight > COLLAPSED_H + 20;
+
     return (
         <div
-            ref={sheetRef}
-            className={`
-        absolute left-0 right-0 bottom-0 z-[1001]
-        glass rounded-t-3xl shadow-2xl
-        transition-all duration-300 ease-out
-        ${isExpanded ? 'h-[70%]' : 'h-[210px]'}
-      `}
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            className="absolute left-0 right-0 bottom-0 z-[1001] glass rounded-t-3xl shadow-2xl overflow-hidden"
+            style={{
+                height: sheetHeight,
+                transition: isDragging ? 'none' : 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                paddingBottom: 'env(safe-area-inset-bottom)',
+            }}
         >
             {/* Drag Handle */}
             <div
-                className="flex justify-center py-2.5 cursor-grab active:cursor-grabbing"
+                className="flex justify-center py-2.5 cursor-grab active:cursor-grabbing touch-none select-none"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
-                onClick={() => onToggleExpand(!isExpanded)}
             >
                 <div className="w-10 h-1 bg-slate-500 rounded-full" />
             </div>
@@ -165,7 +188,7 @@ const BottomSheet = ({
             </div>
 
             {/* Content Area */}
-            {isExpanded && (
+            {showContent && (
                 <div className="px-3 pb-3 overflow-hidden">
                     {activeTab === 'sensors' && (
                         <>
@@ -295,7 +318,7 @@ const BottomSheet = ({
             )}
 
             {/* Collapsed Quick Stats */}
-            {!isExpanded && (
+            {!showContent && (
                 <div className="px-3">
                     <div className="grid grid-cols-3 gap-2">
                         <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
