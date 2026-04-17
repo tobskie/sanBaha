@@ -15,6 +15,9 @@ dist-ssr
 # Git worktrees
 .worktrees/
 
+# Hardware secrets — never commit real credentials
+hardware/secrets.h
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
