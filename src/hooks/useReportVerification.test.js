@@ -3,13 +3,13 @@ import { renderHook, act } from '@testing-library/react';
 import useReportVerification from './useReportVerification';
 
 // --- mocks ---
-const mockGetReportMedia = vi.fn();
+const mockSubscribeToReportMedia = vi.fn();
 const mockSubmitVerification = vi.fn();
 const mockSubscribeToVerification = vi.fn();
 
 vi.mock('../services/firebase', () => ({
   database: {},
-  getReportMedia: (...args) => mockGetReportMedia(...args),
+  subscribeToReportMedia: (...args) => mockSubscribeToReportMedia(...args),
   submitVerification: (...args) => mockSubmitVerification(...args),
   subscribeToVerification: (...args) => mockSubscribeToVerification(...args),
 }));
@@ -24,8 +24,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Default: user is logged in
   useAuth.mockReturnValue({ user: { uid: 'user-1' } });
-  // Default: no media
-  mockGetReportMedia.mockResolvedValue(null);
+  // Default: no media callback fired
+  mockSubscribeToReportMedia.mockImplementation((_id, _cb) => vi.fn());
   // Default: subscribeToVerification calls callback immediately with empty data
   mockSubscribeToVerification.mockImplementation((_id, cb) => {
     cb({ count: 0, users: {}, verified: false });
@@ -41,7 +41,7 @@ describe('useReportVerification', () => {
     expect(result.current.count).toBe(0);
     expect(result.current.mediaUrl).toBeNull();
     expect(mockSubscribeToVerification).not.toHaveBeenCalled();
-    expect(mockGetReportMedia).not.toHaveBeenCalled();
+    expect(mockSubscribeToReportMedia).not.toHaveBeenCalled();
   });
 
   it('subscribes to verification data on mount with valid reportId', () => {
@@ -68,8 +68,11 @@ describe('useReportVerification', () => {
     expect(result.current.hasVerified).toBe(true);
   });
 
-  it('sets mediaUrl when getReportMedia resolves with downloadURL', async () => {
-    mockGetReportMedia.mockResolvedValue({ downloadURL: 'https://example.com/img.jpg', isVideo: false });
+  it('sets mediaUrl when subscribeToReportMedia fires with downloadURL', async () => {
+    mockSubscribeToReportMedia.mockImplementation((_id, cb) => {
+      cb({ downloadURL: 'https://example.com/img.jpg', isVideo: false });
+      return vi.fn();
+    });
     const { result } = renderHook(() => useReportVerification('crowd-123'));
     await act(async () => {});
     expect(result.current.mediaUrl).toBe('https://example.com/img.jpg');
