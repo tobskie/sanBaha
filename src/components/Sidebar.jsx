@@ -154,7 +154,7 @@ const Sidebar = ({
                     <SensorCard
                       key={hotspot.id}
                       sensor={hotspot}
-                      isSelected={false}
+                      isSelected={selectedHotspot?.id === hotspot.id}
                       onClick={() => onHotspotSelect(hotspot)}
                     />
                   ))
