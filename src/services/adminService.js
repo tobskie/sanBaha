@@ -17,11 +17,12 @@ export const adminVerifyReport = async (id) => {
   await update(ref(database, `verifications/${id}`), { verified: true });
 };
 
-export const adminDeleteReport = async (id) => {
-  await remove(ref(database, `crowd_reports/${id}`));
-  await remove(ref(database, `verifications/${id}`));
-  await remove(ref(database, `media_uploads/${id}`));
-};
+export const adminDeleteReport = (id) =>
+  update(ref(database, '/'), {
+    [`crowd_reports/${id}`]: null,
+    [`verifications/${id}`]: null,
+    [`media_uploads/${id}`]: null,
+  });
 
 // --- Sensors ---
 
