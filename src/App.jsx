@@ -31,6 +31,8 @@ import { database as db } from './services/firebase';
 import Toast from './components/Toast';
 import ReviewQueuePanel from './components/ReviewQueuePanel';
 import NavigationBanner from './components/NavigationBanner';
+import AlertBanner from './components/AlertBanner';
+import { subscribeToAlerts } from './services/firebase';
 import useNavigationStep from './hooks/useNavigationStep';
 import Sidebar from './components/Sidebar';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -69,6 +71,9 @@ function App() {
 
   const [showReportPanel, setShowReportPanel] = useState(false);
   const [showReviewQueue, setShowReviewQueue] = useState(false);
+
+  const [activeAlerts, setActiveAlerts] = useState([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
 
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
@@ -233,6 +238,10 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  // Real-time city-wide alerts
+  useEffect(() => {
+    return subscribeToAlerts(setActiveAlerts);
+  }, []);
 
   const handleHotspotSelect = (hotspot) => {
     setSelectedHotspot(hotspot);
@@ -401,6 +410,10 @@ function App() {
     }
   };
 
+  const handleDismissAlert = (id) => {
+    setDismissedAlerts((prev) => new Set([...prev, id]));
+  };
+
   // Refresh button handler
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -464,6 +477,8 @@ function App() {
     setToast({ message: 'Flood report submitted!', type: 'success' });
   };
 
+  const alertBannerHeight = activeAlerts.filter(a => !dismissedAlerts.has(a.id)).length > 0 ? 42 : 0;
+
   return (
     <Routes>
       <Route path="/admin" element={<AdminLayout />}>
@@ -477,6 +492,11 @@ function App() {
         </Route>
       <Route path="/*" element={
       <div className="h-full w-full bg-[#0a1628] overflow-hidden relative">
+      <AlertBanner
+        alerts={activeAlerts}
+        dismissed={dismissedAlerts}
+        onDismiss={handleDismissAlert}
+      />
       {/* Portal target for expanded search (must be at app root to escape BottomSheet overflow) */}
       <div id="search-portal" className="absolute inset-0 z-[2500] pointer-events-none [&>*]:pointer-events-auto" />
       {/* Mobile Header */}
@@ -492,7 +512,7 @@ function App() {
       <div
         className="absolute inset-0"
         style={{
-          paddingTop: 'calc(4rem + env(safe-area-inset-top))',
+          paddingTop: `calc(4rem + ${alertBannerHeight}px + env(safe-area-inset-top))`,
           left: !isMobile && isSidebarOpen ? 320 : 0,
           transition: 'left 0.2s ease',
         }}

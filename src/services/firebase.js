@@ -190,19 +190,39 @@ export const submitVerification = async (reportId, userId) => {
   });
 
   if (newCount >= 3) {
-    await dbSet(ref(database, `verifications/${reportId}/verified`), true);
+    await Promise.all([
+      dbSet(ref(database, `verifications/${reportId}/verified`), true),
+      dbSet(ref(database, `crowd_reports/${reportId}/verified`), true),
+    ]);
   }
 
   return { count: newCount, verified: newCount >= 3 };
 };
 
 /**
- * Fetch media upload metadata for a report (one-time read).
- * Returns { downloadURL, isVideo } if upload exists and has a URL, otherwise null.
+ * Subscribe to media upload metadata for a report.
+ * Fires callback with { downloadURL, isVideo } when the URL becomes available.
+ * Returns an unsubscribe function.
  */
-export const getReportMedia = async (reportId) => {
-  const snap = await get(ref(database, `media_uploads/${reportId}`));
-  const data = snap.val();
-  if (!data?.downloadURL) return null;
-  return { downloadURL: data.downloadURL, isVideo: data.isVideo || false };
+export const subscribeToReportMedia = (reportId, callback) => {
+  const mediaRef = ref(database, `media_uploads/${reportId}`);
+  return onValue(mediaRef, (snap) => {
+    const data = snap.val();
+    if (data?.downloadURL) {
+      callback({ downloadURL: data.downloadURL, isVideo: data.isVideo || false });
+    }
+  });
+};
+
+export const subscribeToAlerts = (callback) => {
+  const alertsRef = ref(database, 'alerts');
+  return onValue(alertsRef, (snap) => {
+    const data = snap.val() || {};
+    const now = new Date();
+    const active = Object.entries(data)
+      .map(([id, item]) => ({ id, ...item }))
+      .filter((a) => new Date(a.expiresAt) > now);
+    active.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    callback(active);
+  });
 };
