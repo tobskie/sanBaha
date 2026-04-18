@@ -30,7 +30,7 @@ export const signInWithGoogle = async () => {
   const userRef = ref(database, `users/${uid}`);
   const snap = await get(userRef);
   if (!snap.exists()) {
-    await update(userRef, { displayName, email, role: 'citizen' });
+    await update(userRef, { displayName, email, role: 'user' });
   }
   return result;
 };

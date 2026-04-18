@@ -23,7 +23,7 @@ export default function AdminUsers() {
 
   const toggleRole = (uid, currentRole) => {
     if (uid === currentUser?.uid) return;
-    adminSetUserRole(uid, currentRole === 'admin' ? 'citizen' : 'admin');
+    adminSetUserRole(uid, currentRole === 'admin' ? 'user' : 'admin');
   };
 
   return (
@@ -55,7 +55,7 @@ export default function AdminUsers() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${isAdmin ? 'text-[#00d4ff] bg-[#00d4ff]/10 border border-[#00d4ff]/20' : 'text-slate-400 bg-[#162d4d] border border-[#162d4d]'}`}>
-                    {u.role || 'citizen'}
+                    {u.role || 'user'}
                   </span>
                   <button
                     onClick={() => toggleRole(u.uid, u.role)}

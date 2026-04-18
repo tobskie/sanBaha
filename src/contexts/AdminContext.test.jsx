@@ -22,7 +22,7 @@ vi.mock('firebase/database', () => ({
 
 function TestConsumer() {
   const { isAdmin } = useAdmin();
-  return <div>{isAdmin ? 'admin' : 'citizen'}</div>;
+  return <div>{isAdmin ? 'admin' : 'user'}</div>;
 }
 
 describe('AdminContext', () => {

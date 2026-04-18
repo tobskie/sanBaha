@@ -3,20 +3,20 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { database, onAuthChange } from '../services/firebase';
 
-const AdminContext = createContext({ isAdmin: false, role: 'citizen', loading: true });
+const AdminContext = createContext({ isAdmin: false, role: 'user', loading: true });
 
 export function AdminProvider({ children }) {
-  const [role, setRole] = useState('citizen');
+  const [role, setRole] = useState('user');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let roleUnsub = () => {};
     const authUnsub = onAuthChange((user) => {
       roleUnsub();
-      if (!user) { setRole('citizen'); setLoading(false); return; }
+      if (!user) { setRole('user'); setLoading(false); return; }
       const roleRef = ref(database, `users/${user.uid}/role`);
       roleUnsub = onValue(roleRef, (snap) => {
-        setRole(snap.val() || 'citizen');
+        setRole(snap.val() || 'user');
         setLoading(false);
       });
     });
