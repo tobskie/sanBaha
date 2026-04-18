@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import SensorCard from './SensorCard';
 import DestinationSearch from './DestinationSearch';
 
+const MINIMIZED_H = 52;
 const COLLAPSED_H = 210;
 const expandedH = () => Math.round(window.innerHeight * 0.7);
 
@@ -13,6 +14,7 @@ const BottomSheet = ({
     onOpenNavigation,
     isExpanded,
     onToggleExpand,
+    onSheetHeightChange,
     isRouting,
     userLocation,
     onReport,
@@ -70,7 +72,7 @@ const BottomSheet = ({
         lastTime.current = now;
 
         const delta = dragStartY.current - y;
-        const newH = Math.max(COLLAPSED_H, Math.min(expandedH(), dragStartHeight.current + delta));
+        const newH = Math.max(MINIMIZED_H, Math.min(expandedH(), dragStartHeight.current + delta));
         sheetHeightRef.current = newH;
         setSheetHeight(newH);
     };
@@ -78,14 +80,23 @@ const BottomSheet = ({
     const endDrag = () => {
         setIsDragging(false);
         const max = expandedH();
-        const mid = (COLLAPSED_H + max) / 2;
-        if (velocity.current > 0.4 || sheetHeightRef.current > mid) {
-            setSheetHeight(max);
+        const midUpperHalf = (COLLAPSED_H + max) / 2;
+        const midLowerHalf = (MINIMIZED_H + COLLAPSED_H) / 2;
+
+        let snapped;
+        if (velocity.current > 0.4 || sheetHeightRef.current > midUpperHalf) {
+            snapped = max;
             onToggleExpand(true);
+        } else if (velocity.current < -0.4 || sheetHeightRef.current < midLowerHalf) {
+            snapped = MINIMIZED_H;
+            onToggleExpand(false);
         } else {
-            setSheetHeight(COLLAPSED_H);
+            snapped = COLLAPSED_H;
             onToggleExpand(false);
         }
+        setSheetHeight(snapped);
+        sheetHeightRef.current = snapped;
+        onSheetHeightChange?.(snapped);
         velocity.current = 0;
     };
 
@@ -109,11 +120,12 @@ const BottomSheet = ({
     };
 
 
+    const isMinimized = sheetHeight <= MINIMIZED_H + 10;
     const showContent = sheetHeight > COLLAPSED_H + 20;
 
     return (
         <div
-            className="absolute left-0 right-0 bottom-0 z-[1001] glass rounded-t-3xl shadow-2xl overflow-hidden"
+            className="absolute left-0 right-0 bottom-0 z-[1001] glass rounded-t-3xl shadow-2xl overflow-hidden md:hidden"
             style={{
                 height: sheetHeight,
                 transition: isDragging ? 'none' : 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -134,7 +146,7 @@ const BottomSheet = ({
             </div>
 
             {/* Header Section */}
-            <div className="px-3 pb-2">
+            <div className={`px-3 pb-2 ${isMinimized ? 'hidden' : ''}`}>
                 {/* Action Row: Report | Search | Refresh */}
                 <div className="flex items-center gap-2 mb-2">
                     {/* Report Flood */}
@@ -320,7 +332,7 @@ const BottomSheet = ({
             )}
 
             {/* Collapsed Quick Stats */}
-            {!showContent && (
+            {!showContent && !isMinimized && (
                 <div className="px-3">
                     <div className="grid grid-cols-3 gap-2">
                         <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">

@@ -26,6 +26,8 @@ import Toast from './components/Toast';
 import ReviewQueuePanel from './components/ReviewQueuePanel';
 import NavigationBanner from './components/NavigationBanner';
 import useNavigationStep from './hooks/useNavigationStep';
+import Sidebar from './components/Sidebar';
+import { useIsMobile } from './hooks/useIsMobile';
 
 function App() {
   const { user, requireAuth, logout } = useAuth();
@@ -42,6 +44,8 @@ function App() {
   const [destination, setDestination] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
+  const [bottomSheetHeight, setBottomSheetHeight] = useState(210);
+  const [floodAlertData, setFloodAlertData] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -60,9 +64,13 @@ function App() {
   const [showReportPanel, setShowReportPanel] = useState(false);
   const [showReviewQueue, setShowReviewQueue] = useState(false);
 
+  const isMobile = useIsMobile();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   const [showHistoricalData, setShowHistoricalData] = useState(false);
   const [showHazardMap, setShowHazardMap] = useState(false);
   const [weatherData, setWeatherData] = useState(null);
@@ -252,7 +260,11 @@ function App() {
     stepsWithFloodWarning,
     currentLanes,
     isOffRoute,
-  } = useNavigationStep(routeData, userLocation, floodZones, handleReroute);
+    isArrived,
+  } = useNavigationStep(routeData, userLocation, floodZones, handleReroute, () => {
+    // Auto-end navigation 4 seconds after arrival
+    setTimeout(() => handleStopNavigation(), 4000);
+  });
 
   // Navigate with coordinates
   const handleNavigateWithCoords = async (origin, dest) => {
@@ -295,15 +307,15 @@ function App() {
           navigator.serviceWorker.controller.postMessage({ type: 'START_NAV', bbox, token: MAPBOX_TOKEN });
         }
 
-        // Build toast message
+        if (result.unavoidable) {
+          setFloodAlertData(result);
+          return;
+        }
+
         let toastMsg = 'Route found! Follow blue line.';
         let toastType = 'info';
-        if (result.unavoidable) {
-          toastMsg = 'Only available route crosses a flood zone. Proceed with caution.';
-          toastType = 'warning';
-        } else if (result.historicalWarnings?.length > 0) {
+        if (result.historicalWarnings?.length > 0) {
           toastMsg = 'Route adjusted to avoid historically flood-prone areas.';
-          toastType = 'info';
         }
         setToast({ message: toastMsg, type: toastType });
       } else {
@@ -461,7 +473,14 @@ function App() {
       />
 
       {/* Map Container */}
-      <div className="absolute inset-0" style={{ paddingTop: 'calc(4rem + env(safe-area-inset-top))' }}>
+      <div
+        className="absolute inset-0"
+        style={{
+          paddingTop: 'calc(4rem + env(safe-area-inset-top))',
+          left: !isMobile && isSidebarOpen ? 320 : 0,
+          transition: 'left 0.2s ease',
+        }}
+      >
         <FloodMap
           ref={mapRef}
           hotspots={hotspots}
@@ -478,7 +497,7 @@ function App() {
           isRaining={isRainfallActive(weatherData)}
           onWeatherUpdate={setWeatherData}
           showFloodZones={showFloodZones}
-          bottomOffset={isBottomSheetExpanded ? Math.round(window.innerHeight * 0.7) : 210}
+          bottomOffset={isMobile ? bottomSheetHeight : 0}
           topOffset={currentStep ? 90 : 0}
           onError={(msg) => setToast({ message: msg, type: 'error' })}
         />
@@ -523,11 +542,12 @@ function App() {
         stepsWithFloodWarning={stepsWithFloodWarning}
         currentLanes={currentLanes}
         isOffRoute={isOffRoute}
+        isArrived={isArrived}
         onEnd={handleStopNavigation}
       />
 
       {/* Hotspot mini-card — tap More Info to expand */}
-      {selectedHotspot && !routeData && !showNavigationPanel && !showDetail && (
+      {isMobile && selectedHotspot && !routeData && !showNavigationPanel && !showDetail && (
         <HotspotMiniCard
           hotspot={selectedHotspot}
           onMoreInfo={() => setShowDetail(true)}
@@ -536,7 +556,7 @@ function App() {
       )}
 
       {/* Hotspot full detail — shown after tapping More Info */}
-      {selectedHotspot && !routeData && !showNavigationPanel && showDetail && (
+      {isMobile && selectedHotspot && !routeData && !showNavigationPanel && showDetail && (
         <HotspotDetail
           hotspot={selectedHotspot}
           onClose={() => { setSelectedHotspot(null); setShowDetail(false); }}
@@ -545,6 +565,24 @@ function App() {
           onError={(msg) => setToast({ message: msg, type: 'error' })}
         />
       )}
+
+      {/* Sidebar — tablet+ only */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(o => !o)}
+        hotspots={hotspots}
+        selectedHotspot={!isMobile ? selectedHotspot : null}
+        onHotspotSelect={(h) => { setSelectedHotspot(h); setShowDetail(false); }}
+        onNavigate={handleNavigate}
+        isRouting={isRouting}
+        onReport={() => setShowReportPanel(true)}
+        onSelectDestination={handleSelectDestination}
+        onOpenNavigation={handleOpenNavigation}
+        userLocation={userLocation}
+        isRefreshing={isRefreshing}
+        onRefresh={handleRefresh}
+        onError={(msg) => setToast({ message: msg, type: 'error' })}
+      />
 
       {/* Bottom Sheet */}
       <BottomSheet
@@ -555,7 +593,11 @@ function App() {
         onOpenNavigation={handleOpenNavigation}
         onNavigate={handleNavigate}
         isExpanded={isBottomSheetExpanded}
-        onToggleExpand={setIsBottomSheetExpanded}
+        onToggleExpand={(expanded) => {
+          setIsBottomSheetExpanded(expanded);
+          setBottomSheetHeight(expanded ? Math.round(window.innerHeight * 0.7) : 210);
+        }}
+        onSheetHeightChange={setBottomSheetHeight}
         isRouting={isRouting}
         userLocation={userLocation}
         onReport={() => setShowReportPanel(true)}
@@ -696,6 +738,56 @@ function App() {
                 </svg>
                 About sanBaha
               </button>
+
+              {/* Open Source References */}
+              <div className="rounded-xl overflow-hidden border border-[#00d4ff]/10">
+                <button
+                  onClick={() => setShowCredits(c => !c)}
+                  className="w-full p-3 bg-[#162d4d] text-left text-white flex items-center gap-3 active:scale-[0.98] transition-transform text-sm"
+                >
+                  <svg className="w-5 h-5 text-[#00ff88]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                  <span className="flex-1">Open Source</span>
+                  <svg
+                    className="w-4 h-4 text-slate-500 transition-transform duration-200"
+                    style={{ transform: showCredits ? 'rotate(180deg)' : '' }}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showCredits && (
+                  <div className="bg-[#0d1f35] px-3 pb-3 pt-2 space-y-2">
+                    {[
+                      { name: 'Open-Meteo', desc: 'Weather forecasts', url: 'https://open-meteo.com', color: '#00d4ff' },
+                      { name: 'Mapbox', desc: 'Map tiles & routing', url: 'https://www.mapbox.com', color: '#00d4ff' },
+                      { name: 'OpenStreetMap', desc: 'Map data & geocoding', url: 'https://www.openstreetmap.org', color: '#00ff88' },
+                      { name: 'UP NOAH', desc: 'Flood hazard maps', url: 'https://noah.up.edu.ph', color: '#fbbf24' },
+                      { name: 'Firebase', desc: 'Database & auth', url: 'https://firebase.google.com', color: '#f97316' },
+                      { name: 'Turf.js', desc: 'Geospatial analysis', url: 'https://turfjs.org', color: '#00ff88' },
+                      { name: 'React', desc: 'UI framework', url: 'https://react.dev', color: '#00d4ff' },
+                      { name: 'Tailwind CSS', desc: 'Styling', url: 'https://tailwindcss.com', color: '#00d4ff' },
+                    ].map(({ name, desc, url, color }) => (
+                      <a
+                        key={name}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#162d4d]/60 active:scale-[0.98] transition-transform"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-white">{name}</p>
+                          <p className="text-[10px] text-slate-400">{desc}</p>
+                        </div>
+                        <svg className="w-3 h-3 flex-shrink-0" style={{ color }} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#00d4ff]/10" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
               {user ? (
@@ -874,6 +966,50 @@ function App() {
 
       {/* Login Prompt Modal */}
       <LoginPrompt />
+
+      {/* Flood Alert Modal — shown when all routes are unavoidably flooded */}
+      {floodAlertData && (
+        <div className="absolute inset-0 z-[2500] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setFloodAlertData(null)} />
+          <div className="relative glass-card rounded-2xl p-5 max-w-xs w-full">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-sm">Area Not Passable</h3>
+                <p className="text-[10px] text-red-400">All routes cross flooded areas</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 mb-4">
+              No safe route could be found. All available roads to your destination pass through active flood zones. Travelling this route may be dangerous.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFloodAlertData(null)}
+                className="flex-1 py-2.5 rounded-xl bg-[#162d4d] text-slate-300 text-sm font-medium active:scale-[0.98] transition-transform"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setRouteData(floodAlertData);
+                  setFloodAlertData(null);
+                  setShowNavigationPanel(false);
+                  setSelectedHotspot(null);
+                  setIsFollowMode(true);
+                  setToast({ message: 'Proceeding through flood zone. Stay safe.', type: 'warning' });
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-sm font-semibold active:scale-[0.98] transition-transform"
+              >
+                Proceed Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Review Queue Panel */}
       <ReviewQueuePanel isOpen={showReviewQueue} onClose={() => setShowReviewQueue(false)} />
