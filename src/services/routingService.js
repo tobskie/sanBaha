@@ -495,33 +495,11 @@ export async function getSmartRoute(origin, destination, floodPoints, vehicle = 
  */
 export async function getSmartRouteWithAvoidance(origin, destination, floodPoints, vehicle = null) {
     try {
-        const initial = await getSmartRoute(origin, destination, floodPoints, vehicle);  // ← pass vehicle
+        const initial = await getSmartRoute(origin, destination, floodPoints, vehicle);
         if (!initial.success) return initial;
-        if (!initial.safeRoute.isFlooded) return { ...initial, unavoidable: false };
-
-        const bypassWaypoints = computeBypassWaypoints(initial.safeRoute, initial.floodZones);
-        if (bypassWaypoints.length === 0) return { ...initial, unavoidable: true };
-
-        const retryData = await getDirections(origin, destination, true, bypassWaypoints);
-        if (!retryData.routes || retryData.routes.length === 0) {
-            return { ...initial, unavoidable: true };
-        }
-
-        const retryAnalysis = findSafestRoute(retryData.routes, initial.floodZones);
-
-        // If the bypass route is still flooded, the waypoints didn't help — fall back.
-        if (retryAnalysis.safeRoute.isFlooded) {
-            return { ...initial, unavoidable: true };
-        }
-
-        return {
-            success: true,
-            ...retryAnalysis,
-            floodZones: initial.floodZones,
-            origin,
-            destination,
-            unavoidable: retryAnalysis.safeRoute.isFlooded,
-        };
+        // findSafestRoute already picks the best non-flooded Mapbox alternative when one exists.
+        // If the best route is still flooded, all alternatives go through flood zones — report unavoidable.
+        return { ...initial, unavoidable: initial.safeRoute.isFlooded };
     } catch (error) {
         console.error('Smart routing with avoidance error:', error);
         return { success: false, error: error.message };
