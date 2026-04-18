@@ -2,14 +2,23 @@
   "rules": {
     "flood_sensors": {
       ".read": true,
-      ".write": false
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
     },
     "crowd_reports": {
       ".read": true,
-      ".write": true
+      "$id": {
+        ".write": "!data.exists() || (auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin')",
+        "verified": {
+          ".write": "auth != null"
+        }
+      }
+    },
+    "verifications": {
+      ".read": true,
+      ".write": "auth != null"
     },
     "media_uploads": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": "auth != null"
     },
     "social_intake": {
@@ -19,7 +28,7 @@
     "users": {
       "$uid": {
         ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
-        ".write": "$uid === auth.uid"
+        ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
       }
     },
     "system": {
@@ -29,6 +38,10 @@
     "logs": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
       ".write": false
+    },
+    "alerts": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
     }
   }
 }
