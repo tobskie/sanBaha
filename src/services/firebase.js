@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, push, get, set as dbSet, runTransaction } from 'firebase/database';
+import { getDatabase, ref, onValue, push, get, set as dbSet, runTransaction, update } from 'firebase/database';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getStatusFromWaterLevel } from '../data/mockData';
@@ -24,7 +24,16 @@ export const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Sign in with Google
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const signInWithGoogle = async () => {
+  const result = await signInWithPopup(auth, googleProvider);
+  const { uid, displayName, email } = result.user;
+  const userRef = ref(database, `users/${uid}`);
+  const snap = await get(userRef);
+  if (!snap.exists()) {
+    await update(userRef, { displayName, email, role: 'citizen' });
+  }
+  return result;
+};
 
 // Sign out
 export const logOut = () => signOut(auth);
