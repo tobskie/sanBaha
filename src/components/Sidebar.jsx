@@ -46,6 +46,7 @@ const Sidebar = ({
         style={{
           transform: isOpen ? 'translateX(0)' : 'translateX(-320px)',
           transition: 'transform 0.2s ease',
+          paddingTop: 'calc(4rem + env(safe-area-inset-top))',
         }}
       >
         {/* Header */}
