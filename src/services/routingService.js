@@ -5,9 +5,9 @@ import { getAdjustedThresholds } from '../data/vehicles';
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiYW50b25vbGltcG8iLCJhIjoiY21sZjYxdnNrMDFmbjNmcjVnZGFmZmlwaiJ9.p6iMH63mAesUTBbpoufwBw';
 
 // Buffer radius around flood points (in kilometers)
-const FLOOD_BUFFER_RADIUS = 0.15; // 150 meters
+const FLOOD_BUFFER_RADIUS = 0.08; // 80 meters — tight around the sensor; avoids flagging nearby parallel roads
 export const RAIN_PRECAUTION_THRESHOLD = 25; // mm — moderate rainfall (25mm), road ponding likely
-const PRECAUTIONARY_BUFFER_RADIUS = 0.10; // 100m — smaller buffer for pre-emptive caution
+const PRECAUTIONARY_BUFFER_RADIUS = 0.06; // 60m — smaller buffer for pre-emptive caution
 
 // ── Historical flood zone cache ─────────────────────────────────────────
 let historicalGeoJSONCache = null;
@@ -201,11 +201,7 @@ export async function reverseGeocode(coords) {
 export async function getDirections(origin, destination, alternatives = true, waypoints = []) {
     const allCoords = [origin, ...waypoints, destination];
     const coords = allCoords.map(c => `${c[0]},${c[1]}`).join(';');
-    // Snap intermediate bypass waypoints to roads within 100m; origin/dest unconstrained
-    const radiuses = allCoords.map((_, i) =>
-        (i === 0 || i === allCoords.length - 1) ? 'unlimited' : '100'
-    ).join(';');
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?alternatives=${alternatives}&geometries=geojson&overview=full&steps=true&radiuses=${radiuses}&access_token=${MAPBOX_TOKEN}`;
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?alternatives=${alternatives}&geometries=geojson&overview=full&steps=true&access_token=${MAPBOX_TOKEN}`;
 
     try {
         const response = await fetch(url);
