@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import AdminDashboard from './components/AdminDashboard';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminMedia from './components/admin/AdminMedia';
+import AdminReports from './components/admin/AdminReports';
+import AdminSensors from './components/admin/AdminSensors';
+import AdminUsers from './components/admin/AdminUsers';
+import AdminAlerts from './components/admin/AdminAlerts';
+import AdminLogs from './components/admin/AdminLogs';
 import FloodMap from './components/FloodMap';
 import BottomSheet from './components/BottomSheet';
 import MobileHeader from './components/MobileHeader';
@@ -460,7 +466,15 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Navigate to="/admin/reports" replace />} />
+          <Route path="reports" element={<AdminReports />} />
+          <Route path="sensors" element={<AdminSensors />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="alerts" element={<AdminAlerts />} />
+          <Route path="logs" element={<AdminLogs />} />
+          <Route path="media" element={<AdminMedia />} />
+        </Route>
       <Route path="/*" element={
       <div className="h-full w-full bg-[#0a1628] overflow-hidden relative">
       {/* Portal target for expanded search (must be at app root to escape BottomSheet overflow) */}
