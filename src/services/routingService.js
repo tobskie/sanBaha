@@ -376,22 +376,24 @@ export function findSafestRoute(routes, floodZones) {
 
         let floodPenalty = 0;
         if (intersection.intersects) {
-            // Classify intersected zones by severity
-            const hasHardFlood = intersection.intersectedZones.some(
-                z => z.status !== 'precautionary' && z.status !== 'historical'
-            );
+            const hasFlooded     = intersection.intersectedZones.some(z => z.status === 'flooded');
+            const hasWarning     = intersection.intersectedZones.some(z => z.status === 'warning');
             const hasPrecautionary = intersection.intersectedZones.some(z => z.status === 'precautionary');
-            const hasHistorical = intersection.intersectedZones.some(z => z.status === 'historical');
+            const hasHistorical  = intersection.intersectedZones.some(z => z.status === 'historical');
 
-            if (hasHardFlood) {
-                // Flooded / warning sensor — hard penalty
-                floodPenalty = 1000000 + (intersection.intersectedZones.length * 10000);
+            // Proportional penalties: detour only when meaningfully shorter than flood risk.
+            // flooded  → detour worth up to 6× longer  (penalty = 5× own duration)
+            // warning  → detour worth up to 3× longer  (penalty = 2× own duration)
+            // precaution → detour worth up to 1.5× longer (penalty = 0.5× own duration)
+            // historical → soft hint only               (penalty = 0.25× own duration)
+            if (hasFlooded) {
+                floodPenalty = route.duration * 5;
+            } else if (hasWarning) {
+                floodPenalty = route.duration * 2;
             } else if (hasPrecautionary) {
-                // Sensor with heavy rain — moderate penalty
-                floodPenalty = 500000;
+                floodPenalty = route.duration * 0.5;
             } else if (hasHistorical) {
-                // Historical flood zone during active rain — soft penalty
-                floodPenalty = 250000;
+                floodPenalty = route.duration * 0.25;
             }
         }
 

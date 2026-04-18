@@ -169,8 +169,7 @@ describe('createFloodZones', () => {
 });
 
 describe('findSafestRoute precautionary penalties', () => {
-  it('applies lower penalty (500000) to precautionary zones than flooded (1000000)', async () => {
-    // Make booleanIntersects return true so the route is considered to cross the zone
+  it('applies proportional penalty to precautionary zones (0.5× duration)', async () => {
     turf.booleanIntersects.mockReturnValueOnce(true);
     const { findSafestRoute } = await import('./routingService.js');
     const routes = [
@@ -185,8 +184,8 @@ describe('findSafestRoute precautionary penalties', () => {
       }]
     };
     const result = findSafestRoute(routes, precautionaryZones);
-    // score = 500000 + 300 (duration) = 500300 — not 1000000+
-    expect(result.safeRoute.score).toBe(500300);
+    // score = duration * 0.5 (penalty) + duration = 150 + 300 = 450
+    expect(result.safeRoute.score).toBe(450);
   });
 
   it('returns precautionaryWarnings with zones whose status is precautionary', async () => {
