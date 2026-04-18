@@ -403,8 +403,11 @@ export function findSafestRoute(routes, floodZones) {
             geometry: route.geometry,
             duration: route.duration,
             distance: route.distance,
-            isFlooded: intersection.intersects && intersection.intersectedZones.some(
-                z => z.status !== 'precautionary' && z.status !== 'historical'
+            // isFlooded: only truly impassable (flooded sensor) — not warning/precautionary
+            isFlooded: intersection.intersects && intersection.intersectedZones.some(z => z.status === 'flooded'),
+            // hasWarning: route passes through warning or precautionary zone (caution, but passable)
+            hasWarning: intersection.intersects && intersection.intersectedZones.some(
+                z => z.status === 'warning' || z.status === 'precautionary'
             ),
             floodedZones: intersection.intersectedZones,
             score: floodPenalty + route.duration
@@ -416,15 +419,14 @@ export function findSafestRoute(routes, floodZones) {
     const safeRoutes = analyzedRoutes.filter(r => !r.isFlooded);
     const safeRoute = analyzedRoutes[0];
 
-    const precautionaryWarnings = safeRoute.isFlooded
-        ? []
-        : safeRoute.floodedZones.filter(z => z.status === 'precautionary');
+    const precautionaryWarnings = safeRoute.floodedZones.filter(z => z.status === 'precautionary');
 
     return {
         safeRoute,
         allRoutes: analyzedRoutes,
         hasSafeRoute: safeRoutes.length > 0,
-        warnings: safeRoute.isFlooded ? safeRoute.floodedZones.filter(z => z.status !== 'precautionary' && z.status !== 'historical') : [],
+        warnings: safeRoute.floodedZones.filter(z => z.status === 'flooded'),
+        warningZones: safeRoute.floodedZones.filter(z => z.status === 'warning'),
         precautionaryWarnings,
         historicalWarnings: safeRoute.floodedZones.filter(z => z.status === 'historical'),
     };

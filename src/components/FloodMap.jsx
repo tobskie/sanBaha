@@ -54,15 +54,24 @@ const routeLayer = {
 const routeLayerFlooded = {
     id: 'route-flooded',
     type: 'line',
-    layout: {
-        'line-join': 'round',
-        'line-cap': 'round',
-    },
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
         'line-color': '#ff4444',
         'line-width': 5,
         'line-opacity': 0.8,
         'line-dasharray': [2, 2],
+    },
+};
+
+const routeLayerWarning = {
+    id: 'route-warning',
+    type: 'line',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+        'line-color': '#f59e0b',
+        'line-width': 5,
+        'line-opacity': 0.8,
+        'line-dasharray': [3, 2],
     },
 };
 
@@ -378,7 +387,7 @@ const FloodMap = forwardRef(({
                 {/* Route Line */}
                 {routeGeoJSON && (
                     <Source id="route" type="geojson" data={routeGeoJSON}>
-                        <Layer {...(routeData.safeRoute.isFlooded ? routeLayerFlooded : routeLayer)} />
+                        <Layer {...(routeData.safeRoute.isFlooded ? routeLayerFlooded : routeData.safeRoute.hasWarning ? routeLayerWarning : routeLayer)} />
                     </Source>
                 )}
 
@@ -576,13 +585,23 @@ const FloodMap = forwardRef(({
 
             {/* Route Info Badge — hidden while NavigationBanner is active (topOffset > 0) */}
             {routeData?.safeRoute && topOffset === 0 && (
-                <div className={`absolute left-14 z-10 rounded-xl px-3 py-2 transition-all duration-300 ${routeData.safeRoute.isFlooded
-                    ? 'bg-red-500/20 border border-red-500/30'
-                    : 'bg-emerald-500/20 border border-emerald-500/30'
-                    }`}>
+                <div
+                    className={`absolute left-14 z-10 rounded-xl px-3 py-2 transition-all duration-300 ${
+                        routeData.safeRoute.isFlooded
+                            ? 'bg-red-500/20 border border-red-500/30'
+                            : routeData.safeRoute.hasWarning
+                                ? 'bg-amber-500/20 border border-amber-500/30'
+                                : 'bg-emerald-500/20 border border-emerald-500/30'
+                    }`}
+                    style={{ top: 16 }}
+                >
                     <div className="flex items-center gap-2">
                         {routeData.safeRoute.isFlooded ? (
                             <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                        ) : routeData.safeRoute.hasWarning ? (
+                            <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                             </svg>
                         ) : (
@@ -590,9 +609,14 @@ const FloodMap = forwardRef(({
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                             </svg>
                         )}
-                        <span className={`text-[10px] font-medium ${routeData.safeRoute.isFlooded ? 'text-red-300' : 'text-emerald-300'
-                            }`}>
-                            {routeData.safeRoute.isFlooded ? 'Flood on Route' : 'Safe Route'}
+                        <span className={`text-[10px] font-medium ${
+                            routeData.safeRoute.isFlooded ? 'text-red-300'
+                            : routeData.safeRoute.hasWarning ? 'text-amber-300'
+                            : 'text-emerald-300'
+                        }`}>
+                            {routeData.safeRoute.isFlooded ? 'Flood on Route'
+                             : routeData.safeRoute.hasWarning ? 'Caution: Flood Warning'
+                             : 'Safe Route'}
                         </span>
                     </div>
                 </div>
@@ -628,7 +652,7 @@ const FloodMap = forwardRef(({
             )}
 
             {/* Weather Widget + Info */}
-            <div className="absolute left-4 z-10 transition-all duration-300"
+            <div className="absolute left-4 z-10 transition-all duration-300 w-fit"
                 style={{ bottom: bottomOffset + 16 }}>
                 <WeatherWidget onWeatherUpdate={onWeatherUpdate} />
             </div>
