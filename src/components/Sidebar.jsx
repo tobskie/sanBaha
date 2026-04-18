@@ -42,7 +42,7 @@ const Sidebar = ({
 
       {/* Sidebar panel */}
       <div
-        className="hidden md:flex flex-col absolute left-0 top-0 bottom-0 z-[1001] w-[320px] bg-[#0a1628]/95 backdrop-blur-md border-r border-[#00d4ff]/20"
+        className="hidden md:flex flex-col absolute left-0 top-0 bottom-0 z-[1001] w-[320px] glass border-r border-[#00d4ff]/20"
         style={{
           transform: isOpen ? 'translateX(0)' : 'translateX(-320px)',
           transition: 'transform 0.2s ease',

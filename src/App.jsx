@@ -65,7 +65,9 @@ function App() {
   const [showReviewQueue, setShowReviewQueue] = useState(false);
 
   const isMobile = useIsMobile();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    try { return localStorage.getItem('sanBaha_sidebarOpen') !== 'false'; } catch { return true; }
+  });
 
   // UI state
   const [showSettings, setShowSettings] = useState(false);
@@ -569,7 +571,11 @@ function App() {
       {/* Sidebar — tablet+ only */}
       <Sidebar
         isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(o => !o)}
+        onToggle={() => setIsSidebarOpen(o => {
+          const next = !o;
+          try { localStorage.setItem('sanBaha_sidebarOpen', String(next)); } catch {}
+          return next;
+        })}
         hotspots={hotspots}
         selectedHotspot={!isMobile ? selectedHotspot : null}
         onHotspotSelect={(h) => { setSelectedHotspot(h); setShowDetail(false); }}
