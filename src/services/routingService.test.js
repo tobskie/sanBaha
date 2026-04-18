@@ -59,18 +59,17 @@ describe('computeBypassWaypoints', () => {
     expect(result).toEqual([]);
   });
 
-  it('returns two waypoints (entry+exit bracket) per intersected flood zone', async () => {
-    // booleanIntersects: route crosses the zone
+  it('returns one midpoint waypoint per intersected hard flood zone', async () => {
     turf.booleanIntersects.mockReturnValueOnce(true);
-    // lineIntersect returns two crossing points (entry + exit)
     turf.lineIntersect.mockReturnValueOnce({
       features: [
         { geometry: { coordinates: [121.12, 13.92] } },
         { geometry: { coordinates: [121.14, 13.94] } },
       ]
     });
-    // nearestPointOnLine: entry at location 50, exit at location 150 (sorted order)
+    // nearestPointOnLine: centroid snap, then entry location, then exit location
     turf.nearestPointOnLine
+      .mockReturnValueOnce({ geometry: { coordinates: [121.13, 13.93] }, properties: { location: 100 } })
       .mockReturnValueOnce({ geometry: { coordinates: [121.12, 13.92] }, properties: { location: 50 } })
       .mockReturnValueOnce({ geometry: { coordinates: [121.14, 13.94] }, properties: { location: 150 } });
 
@@ -85,11 +84,9 @@ describe('computeBypassWaypoints', () => {
       ]
     };
     const result = computeBypassWaypoints(routeLine, floodZones);
-    // Two waypoints: one at entry, one at exit
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(1);
     expect(Array.isArray(result[0])).toBe(true);
-    expect(result[0]).toHaveLength(2); // [lon, lat]
-    expect(result[1]).toHaveLength(2);
+    expect(result[0]).toHaveLength(2);
   });
 
   it('falls back to single centroid waypoint when lineIntersect returns fewer than 2 points', async () => {
@@ -112,7 +109,7 @@ describe('computeBypassWaypoints', () => {
     expect(result).toHaveLength(1);
   });
 
-  it('flips to opposite side when bracket waypoints land inside a flood zone', async () => {
+  it('flips to opposite side when midpoint waypoint lands inside a flood zone', async () => {
     turf.booleanIntersects.mockReturnValueOnce(true);
     turf.lineIntersect.mockReturnValueOnce({
       features: [
@@ -121,12 +118,11 @@ describe('computeBypassWaypoints', () => {
       ]
     });
     turf.nearestPointOnLine
+      .mockReturnValueOnce({ geometry: { coordinates: [121.13, 13.93] }, properties: { location: 100 } })
       .mockReturnValueOnce({ geometry: { coordinates: [121.12, 13.92] }, properties: { location: 50 } })
       .mockReturnValueOnce({ geometry: { coordinates: [121.14, 13.94] }, properties: { location: 150 } });
-    // Right-side candidates are inside a flood zone
-    turf.booleanPointInPolygon
-      .mockReturnValueOnce(true)   // entry: right side blocked
-      .mockReturnValueOnce(true);  // exit: right side blocked
+    // Right-side midpoint is inside a flood zone — should flip to left
+    turf.booleanPointInPolygon.mockReturnValueOnce(true);
 
     const destSpy = turf.destination;
     const { computeBypassWaypoints } = await import('./routingService.js');
@@ -140,8 +136,8 @@ describe('computeBypassWaypoints', () => {
       ]
     };
     computeBypassWaypoints(routeLine, floodZones);
-    // destination called 4 times: right entry, right exit (initial), left entry, left exit (flipped)
-    expect(destSpy).toHaveBeenCalledTimes(4);
+    // destination called 2 times: right (initial attempt), left (flipped)
+    expect(destSpy).toHaveBeenCalledTimes(2);
   });
 });
 
