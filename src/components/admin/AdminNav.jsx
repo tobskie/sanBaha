@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 
 const NAV_ITEMS = [
   { to: '/admin/reports', label: 'Reports', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
@@ -11,7 +11,7 @@ const NAV_ITEMS = [
 
 export default function AdminNav() {
   return (
-    <nav className="flex flex-col h-full py-4">
+    <nav className="flex flex-col h-full py-4" aria-label="Admin navigation">
       <div className="px-4 mb-6">
         <h1 className="text-sm font-bold gradient-text">sanBaha Admin</h1>
       </div>
@@ -36,15 +36,15 @@ export default function AdminNav() {
         ))}
       </div>
       <div className="px-2 mt-4 border-t border-[#162d4d] pt-4">
-        <a
-          href="/"
+        <Link
+          to="/"
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-[#162d4d] transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
           Back to app
-        </a>
+        </Link>
       </div>
     </nav>
   );
