@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import MediaUpload from './MediaUpload';
-import { hasMediaConsent, setMediaConsent } from '../services/firebase';
+import { hasMediaConsent, setMediaConsent, revokeMediaConsent } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 const ReportFloodPanel = ({
@@ -18,6 +18,14 @@ const ReportFloodPanel = ({
     const { user } = useAuth();
     const [mediaFile, setMediaFile] = useState(null);
     const [showConsentPrompt, setShowConsentPrompt] = useState(false);
+    const [consentGiven, setConsentGiven] = useState(false);
+
+    // Load existing consent state when panel opens
+    useEffect(() => {
+        if (isOpen && user) {
+            hasMediaConsent(user.uid).then(setConsentGiven);
+        }
+    }, [isOpen, user]);
 
     // Get location name from coordinates
     useEffect(() => {
@@ -210,6 +218,21 @@ const ReportFloodPanel = ({
                                 Photo / Video
                             </label>
                             <MediaUpload onChange={setMediaFile} disabled={isSubmitting} />
+                            {consentGiven && user && (
+                                <div className="mt-2 flex items-center justify-between">
+                                    <span className="text-[10px] text-emerald-400">Media consent granted</span>
+                                    <button
+                                        className="text-[10px] text-slate-400 underline underline-offset-2 hover:text-red-400 transition-colors"
+                                        onClick={async () => {
+                                            await revokeMediaConsent(user.uid);
+                                            setConsentGiven(false);
+                                            setMediaFile(null);
+                                        }}
+                                    >
+                                        Revoke consent
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Submit Button */}
@@ -267,6 +290,7 @@ const ReportFloodPanel = ({
                                             className="flex-1 py-2 rounded-lg bg-gradient-to-r from-[#00d4ff] to-[#00ff88] text-[#0a1628] text-sm font-semibold"
                                             onClick={async () => {
                                                 await setMediaConsent(user.uid);
+                                                setConsentGiven(true);
                                                 setShowConsentPrompt(false);
                                                 handleSubmit();
                                             }}

@@ -164,6 +164,9 @@ export const hasMediaConsent = async (uid) => {
 export const setMediaConsent = (uid) =>
   dbSet(ref(database, `users/${uid}/mediaConsentGiven`), true);
 
+export const revokeMediaConsent = (uid) =>
+  dbSet(ref(database, `users/${uid}/mediaConsentGiven`), false);
+
 // ---------- Crowdsource Verification ----------
 
 /**
