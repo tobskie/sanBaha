@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
+import * as turf from '@turf/turf';
 import Map, { Marker, Popup, NavigationControl, Source, Layer } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { getStatusDetails } from '../data/mockData';
@@ -329,14 +330,27 @@ const FloodMap = forwardRef(({
         }
     };
 
-    // Create route GeoJSON
-    const routeGeoJSON = routeData?.safeRoute?.geometry ? {
-        type: 'Feature',
-        geometry: routeData.safeRoute.geometry,
-        properties: {
-            isFlooded: routeData.safeRoute.isFlooded
+    // Route GeoJSON trimmed to user's current position (remaining route only)
+    const routeGeoJSON = useMemo(() => {
+        if (!routeData?.safeRoute?.geometry) return null;
+        const props = {
+            isFlooded: routeData.safeRoute.isFlooded,
+            hasWarning: routeData.safeRoute.hasWarning,
+        };
+        const coords = routeData.safeRoute.geometry.coordinates;
+        if (!userLocation || coords.length < 2) {
+            return { type: 'Feature', geometry: routeData.safeRoute.geometry, properties: props };
         }
-    } : null;
+        try {
+            const routeLine = turf.lineString(coords);
+            const snapped = turf.nearestPointOnLine(routeLine, turf.point(userLocation));
+            const end = turf.point(coords[coords.length - 1]);
+            const remaining = turf.lineSlice(snapped, end, routeLine);
+            return { type: 'Feature', geometry: remaining.geometry, properties: props };
+        } catch {
+            return { type: 'Feature', geometry: routeData.safeRoute.geometry, properties: props };
+        }
+    }, [routeData, userLocation]);
 
     // Handle map move - disable follow mode if user pans manually
     const handleMapMove = useCallback((evt) => {
