@@ -51,7 +51,6 @@ const ReportFloodPanel = ({
         setIsSubmitting(true);
 
         const report = {
-            id: `crowd-${Date.now()}`,
             type: 'crowdsourced',
             coordinates: [userLocation[1], userLocation[0]],
             severity,

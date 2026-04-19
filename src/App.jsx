@@ -449,8 +449,9 @@ function App() {
 
   // Handle crowdsourced flood report submission
   const handleReportSubmit = async (report, mediaFile) => {
+    let pushResult;
     try {
-      await submitFloodReport(report);
+      pushResult = await submitFloodReport(report);
     } catch (err) {
       console.error('submitFloodReport failed:', err);
       setToast({ message: 'Failed to save report. Please try again.', type: 'error' });
@@ -459,8 +460,9 @@ function App() {
 
     // Write /media_uploads metadata; upload queue fills in storage paths
     if (mediaFile && user) {
-      await fSet(fRef(db, `media_uploads/${report.id}`), {
-        reportId: report.id,
+      const reportId = pushResult.key;
+      await fSet(fRef(db, `media_uploads/${reportId}`), {
+        reportId,
         uploaderId: user.uid,
         uploaderName: user.displayName || 'Anonymous',
         type: mediaFile.type.startsWith('video/') ? 'video' : 'photo',
@@ -470,7 +472,7 @@ function App() {
         uploadedAt: null,
         processingStatus: 'queued',
       });
-      await enqueueUpload(report.id, mediaFile);
+      await enqueueUpload(reportId, mediaFile);
     }
 
     // No manual hotspot push needed — subscribeToCrowdReports fires automatically
