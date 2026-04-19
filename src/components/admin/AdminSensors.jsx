@@ -8,11 +8,24 @@ import {
 
 const EMPTY_FORM = { name: '', latitude: '', longitude: '', waterLevel: '' };
 
+const validateSensorFields = (fields) => {
+  const name = (fields.name || '').trim();
+  if (!name) return 'Name is required.';
+  const lat = parseFloat(fields.latitude);
+  const lng = parseFloat(fields.longitude);
+  const wl = parseFloat(fields.waterLevel);
+  if (isNaN(lat) || lat < 13.85 || lat > 14.05) return 'Latitude must be between 13.85 and 14.05 (Lipa City area).';
+  if (isNaN(lng) || lng < 121.05 || lng > 121.25) return 'Longitude must be between 121.05 and 121.25 (Lipa City area).';
+  if (isNaN(wl) || wl < 0) return 'Water level must be a non-negative number.';
+  return null; // valid
+};
+
 export default function AdminSensors() {
   const [sensors, setSensors] = useState([]);
   const [editing, setEditing] = useState({});
   const [addForm, setAddForm] = useState(EMPTY_FORM);
   const [showAdd, setShowAdd] = useState(false);
+  const [validationError, setValidationError] = useState(null);
 
   useEffect(() => {
     return subscribeToAllSensors(setSensors);
@@ -32,12 +45,16 @@ export default function AdminSensors() {
 
   const cancelEdit = (id) => {
     setEditing((prev) => { const n = { ...prev }; delete n[id]; return n; });
+    setValidationError(null);
   };
 
   const saveEdit = async (id) => {
     const fields = editing[id];
+    const err = validateSensorFields(fields);
+    if (err) { setValidationError(err); return; }
+    setValidationError(null);
     await adminUpdateSensor(id, {
-      name: fields.name,
+      name: fields.name.trim(),
       latitude: parseFloat(fields.latitude),
       longitude: parseFloat(fields.longitude),
       waterLevel: parseFloat(fields.waterLevel),
@@ -46,12 +63,14 @@ export default function AdminSensors() {
   };
 
   const handleAdd = async () => {
-    if (!addForm.name) return;
+    const err = validateSensorFields(addForm);
+    if (err) { setValidationError(err); return; }
+    setValidationError(null);
     await adminAddSensor({
-      name: addForm.name,
-      latitude: parseFloat(addForm.latitude) || 0,
-      longitude: parseFloat(addForm.longitude) || 0,
-      waterLevel: parseFloat(addForm.waterLevel) || 0,
+      name: addForm.name.trim(),
+      latitude: parseFloat(addForm.latitude),
+      longitude: parseFloat(addForm.longitude),
+      waterLevel: parseFloat(addForm.waterLevel),
     });
     setAddForm(EMPTY_FORM);
     setShowAdd(false);
@@ -95,11 +114,12 @@ export default function AdminSensors() {
             onChange={(e) => setAddForm((f) => ({ ...f, waterLevel: e.target.value }))}
             className="bg-[#162d4d] rounded-lg px-3 py-2 text-sm text-white border border-[#162d4d] focus:border-[#00d4ff]/40 outline-none"
           />
+          {validationError && <p className="col-span-2 text-xs text-red-400">{validationError}</p>}
           <div className="flex gap-2 col-span-2">
             <button onClick={handleAdd} className="px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
               Save
             </button>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-2 rounded-lg bg-[#162d4d] text-slate-400 text-xs">
+            <button onClick={() => { setShowAdd(false); setValidationError(null); }} className="px-4 py-2 rounded-lg bg-[#162d4d] text-slate-400 text-xs">
               Cancel
             </button>
           </div>
@@ -138,6 +158,7 @@ export default function AdminSensors() {
                     onChange={(e) => setEditing((p) => ({ ...p, [sensor.id]: { ...p[sensor.id], waterLevel: e.target.value } }))}
                     className="bg-[#162d4d] rounded-lg px-3 py-2 text-sm text-white border border-[#162d4d] focus:border-[#00d4ff]/40 outline-none"
                   />
+                  {validationError && <p className="col-span-2 text-xs text-red-400">{validationError}</p>}
                   <div className="flex gap-2 col-span-2">
                     <button onClick={() => saveEdit(sensor.id)} className="px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-medium">Save</button>
                     <button onClick={() => cancelEdit(sensor.id)} className="px-3 py-1.5 rounded-lg bg-[#162d4d] text-slate-400 text-xs">Cancel</button>
@@ -153,7 +174,7 @@ export default function AdminSensors() {
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => startEdit(sensor)} className="px-3 py-1.5 rounded-lg bg-[#162d4d] text-slate-300 text-xs font-medium">Edit</button>
-                    <button onClick={() => adminDeleteSensor(sensor.id)} className="px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-medium">Delete</button>
+                    <button onClick={() => { if (window.confirm(`Delete sensor "${sensor.name || sensor.id}"? This cannot be undone.`)) adminDeleteSensor(sensor.id); }} className="px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-medium">Delete</button>
                   </div>
                 </div>
               )}

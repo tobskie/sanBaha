@@ -84,7 +84,7 @@ export default function AdminReports() {
                     </button>
                   )}
                   <button
-                    onClick={() => adminDeleteReport(r.id)}
+                    onClick={() => { if (window.confirm(`Delete report "${r.locationName || r.id}"? This cannot be undone.`)) adminDeleteReport(r.id); }}
                     className="px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-medium"
                   >
                     Delete
