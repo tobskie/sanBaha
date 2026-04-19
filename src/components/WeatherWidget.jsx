@@ -6,12 +6,19 @@ const POLL_INTERVAL_MS = 10 * 60 * 1000;
 const WeatherWidget = ({ onWeatherUpdate }) => {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       const data = await fetchWeather();
       if (mounted && data) {
+        if (data?.current?.temp == null || data?.current?.humidity == null) {
+          setError('Weather data unavailable');
+          setLoading(false);
+          return;
+        }
+        setError(null);
         setWeather(data);
         setLoading(false);
         onWeatherUpdate?.(data);
@@ -21,6 +28,14 @@ const WeatherWidget = ({ onWeatherUpdate }) => {
     const interval = setInterval(load, POLL_INTERVAL_MS);
     return () => { mounted = false; clearInterval(interval); };
   }, [onWeatherUpdate]);
+
+  if (error) {
+    return (
+      <div className="glass rounded-xl px-3 py-2 flex items-center gap-2">
+        <span className="text-xs text-amber-400">{error}</span>
+      </div>
+    );
+  }
 
   if (loading || !weather) {
     return (
@@ -77,7 +92,6 @@ const WeatherWidget = ({ onWeatherUpdate }) => {
         </>
       )}
 
-      <span className="text-[10px] text-slate-600 ml-auto pl-1">Open-Meteo</span>
     </div>
   );
 };

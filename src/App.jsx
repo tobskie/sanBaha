@@ -68,6 +68,7 @@ function App() {
   const [originLocation, setOriginLocation] = useState(null);
   const [destLocation, setDestLocation] = useState(null);
   const [isFollowMode, setIsFollowMode] = useState(false);
+  const [gpsError, setGpsError] = useState(null);
 
   const [showReportPanel, setShowReportPanel] = useState(false);
   const [showReviewQueue, setShowReviewQueue] = useState(false);
@@ -182,8 +183,13 @@ function App() {
           isLocationAcquiredRef.current = true;
           prevLocationRef.current = newLocation;
         },
-        (error) => {
-          console.error('Watch position error:', error);
+        (err) => {
+          console.error('Watch position error:', err);
+          if (err.code === 1) { // PERMISSION_DENIED
+            setGpsError('Location access denied. Enable GPS to use navigation features.');
+          } else if (err.code === 2) { // POSITION_UNAVAILABLE
+            setGpsError('GPS signal unavailable. Please check your location settings.');
+          }
         },
         {
           enableHighAccuracy: true,
@@ -529,6 +535,19 @@ function App() {
         isAdmin={isAdmin}
         pendingReviewCount={pendingReviewCount}
       />
+
+      {/* GPS error banner */}
+      {gpsError && (
+        <div className="absolute top-14 left-0 right-0 z-[1001] mx-3 mt-2">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs">
+            <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span className="flex-1">{gpsError}</span>
+            <button onClick={() => setGpsError(null)} className="text-amber-400 hover:text-white">✕</button>
+          </div>
+        </div>
+      )}
 
       {/* Map Container */}
       <div
