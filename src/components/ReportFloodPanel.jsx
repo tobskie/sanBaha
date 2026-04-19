@@ -62,7 +62,8 @@ const ReportFloodPanel = ({
             verified: false,
         };
 
-        onSubmit(report, mediaFile);
+        const safeSeverity = ['warning', 'flooded', 'clear'].includes(report.severity) ? report.severity : 'warning';
+        onSubmit({ ...report, severity: safeSeverity }, mediaFile);
         setIsSubmitting(false);
         setShowSuccess(true);
 
