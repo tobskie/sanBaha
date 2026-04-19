@@ -223,6 +223,8 @@ export const subscribeToReportMedia = (reportId, callback) => {
   });
 };
 
+const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
+
 export const subscribeToAlerts = (callback) => {
   const alertsRef = ref(database, 'alerts');
   return onValue(alertsRef, (snap) => {
@@ -231,7 +233,12 @@ export const subscribeToAlerts = (callback) => {
     const active = Object.entries(data)
       .map(([id, item]) => ({ id, ...item }))
       .filter((a) => new Date(a.expiresAt) > now);
-    active.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    active.sort((a, b) => {
+      const sA = SEVERITY_ORDER[a.severity] ?? 2;
+      const sB = SEVERITY_ORDER[b.severity] ?? 2;
+      if (sA !== sB) return sA - sB;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
     callback(active);
   });
 };

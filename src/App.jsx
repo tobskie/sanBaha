@@ -73,7 +73,17 @@ function App() {
   const [showReviewQueue, setShowReviewQueue] = useState(false);
 
   const [activeAlerts, setActiveAlerts] = useState([]);
-  const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
+  const [dismissedAlerts, setDismissedAlerts] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('dismissedAlerts') || '[]');
+      // Remove entries older than 24 hours
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const fresh = stored.filter(([, ts]) => ts > cutoff);
+      return new Set(fresh.map(([id]) => id));
+    } catch {
+      return new Set();
+    }
+  });
 
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
@@ -411,7 +421,17 @@ function App() {
   };
 
   const handleDismissAlert = (id) => {
-    setDismissedAlerts((prev) => new Set([...prev, id]));
+    setDismissedAlerts(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      // Persist: store as [[id, timestamp], ...] to allow expiry pruning
+      try {
+        const stored = JSON.parse(localStorage.getItem('dismissedAlerts') || '[]');
+        stored.push([id, Date.now()]);
+        localStorage.setItem('dismissedAlerts', JSON.stringify(stored));
+      } catch {}
+      return next;
+    });
   };
 
   // Refresh button handler
