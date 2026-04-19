@@ -1,0 +1,12 @@
+{
+  "name": "sanbaha-fb-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "playwright": "^1.44.0"
+  }
+}
