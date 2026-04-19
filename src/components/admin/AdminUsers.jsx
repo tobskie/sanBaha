@@ -57,19 +57,20 @@ export default function AdminUsers() {
                   <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${isAdmin ? 'text-[#00d4ff] bg-[#00d4ff]/10 border border-[#00d4ff]/20' : 'text-slate-400 bg-[#162d4d] border border-[#162d4d]'}`}>
                     {u.role || 'user'}
                   </span>
-                  <button
-                    onClick={() => toggleRole(u.uid, u.role)}
-                    disabled={isSelf}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      isSelf
-                        ? 'opacity-40 cursor-not-allowed bg-[#162d4d] text-slate-500'
-                        : isAdmin
-                        ? 'bg-red-500/15 border border-red-500/30 text-red-400'
-                        : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
-                    }`}
-                  >
-                    {isAdmin ? 'Revoke Admin' : 'Make Admin'}
-                  </button>
+                  {isSelf ? (
+                    <span className="text-[10px] text-slate-500 italic">You</span>
+                  ) : (
+                    <button
+                      onClick={() => toggleRole(u.uid, u.role)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        isAdmin
+                          ? 'bg-red-500/15 border border-red-500/30 text-red-400'
+                          : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
+                      }`}
+                    >
+                      {isAdmin ? 'Revoke Admin' : 'Make Admin'}
+                    </button>
+                  )}
                 </div>
               </div>
             );

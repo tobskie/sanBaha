@@ -1,5 +1,5 @@
 import { ref, onValue, update, remove, push } from 'firebase/database';
-import { database } from './firebase';
+import { database, auth } from './firebase';
 
 // --- Reports ---
 
@@ -53,8 +53,16 @@ export const subscribeToAllUsers = (callback) => {
   });
 };
 
-export const adminSetUserRole = (uid, role) =>
-  update(ref(database, `users/${uid}`), { role });
+export const adminSetUserRole = async (uid, role) => {
+  await update(ref(database, `users/${uid}`), { role });
+  await push(ref(database, 'logs'), {
+    type: 'role_change',
+    targetUid: uid,
+    newRole: role,
+    changedBy: auth.currentUser?.uid ?? 'unknown',
+    timestamp: new Date().toISOString(),
+  });
+};
 
 // --- Alerts ---
 
