@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import * as turf from '@turf/turf';
 
 const ADVANCE_THRESHOLD_M = 30;
+const ARRIVE_THRESHOLD_M = 30;
 const OFF_ROUTE_THRESHOLD_M = 50;
 const OFF_ROUTE_SECONDS = 5;
 const REROUTE_COOLDOWN_MS = 15000;
 
-export default function useNavigationStep(routeData, userLocation, floodZones, onReroute) {
+export default function useNavigationStep(routeData, userLocation, floodZones, onReroute, onArrive) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [distanceToManeuver, setDistanceToManeuver] = useState(null);
   const [remainingDistance, setRemainingDistance] = useState(null);
@@ -14,14 +15,17 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
   const [stepsWithFloodWarning, setStepsWithFloodWarning] = useState(new Set());
   const [currentLanes, setCurrentLanes] = useState(null);
   const [isOffRoute, setIsOffRoute] = useState(false);
+  const [isArrived, setIsArrived] = useState(false);
 
   const offRouteTimer = useRef(null);
   const lastRerouteRef = useRef(0);
   const stepIndexRef = useRef(0);
+  const arrivedRef = useRef(false);
 
-  // FIX 1: Keep onReroute in a ref so it stays fresh without causing re-runs
   const onRerouteRef = useRef(onReroute);
   useEffect(() => { onRerouteRef.current = onReroute; }, [onReroute]);
+  const onArriveRef = useRef(onArrive);
+  useEffect(() => { onArriveRef.current = onArrive; }, [onArrive]);
 
   const steps = routeData?.safeRoute?.route?.legs?.[0]?.steps ?? [];
   const routeGeometry = routeData?.safeRoute?.geometry ?? null;
@@ -31,6 +35,8 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
     setCurrentStepIndex(0);
     stepIndexRef.current = 0;
     setIsOffRoute(false);
+    setIsArrived(false);
+    arrivedRef.current = false;
     if (offRouteTimer.current) {
       clearTimeout(offRouteTimer.current);
       offRouteTimer.current = null; // FIX 3: null after clearTimeout
@@ -58,7 +64,7 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
   useEffect(() => {
     if (!steps.length) { setCurrentLanes(null); return; }
     const step = steps[currentStepIndex]; // FIX 4: use currentStepIndex not stepIndexRef.current
-    const intersection = step?.intersections?.find(i => i.lanes?.length >= 2);
+    const intersection = [...(step?.intersections ?? [])].reverse().find(i => i.lanes?.length >= 2) ?? null;
     setCurrentLanes(intersection?.lanes ?? null);
   }, [currentStepIndex, routeData]);
 
@@ -85,7 +91,18 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
     setRemainingDistance(Math.round(remaining.d));
     setRemainingDuration(Math.round(remaining.t));
 
-    // FIX 2: Advance step when close to NEXT maneuver
+    // Arrival detection — last step or maneuver type 'arrive'
+    const isLastStep = !nextManeuverStep || currentStep.maneuver?.type === 'arrive';
+    if (isLastStep && !arrivedRef.current) {
+      if (distM <= ARRIVE_THRESHOLD_M) {
+        arrivedRef.current = true;
+        setIsArrived(true);
+        onArriveRef.current?.();
+        return;
+      }
+    }
+
+    // Advance step when close to NEXT maneuver
     if (nextManeuverStep) {
       const nextManeuverPt = turf.point(nextManeuverStep.maneuver.location);
       const distToNext = turf.distance(userPt, nextManeuverPt, { units: 'meters' });
@@ -142,5 +159,6 @@ export default function useNavigationStep(routeData, userLocation, floodZones, o
     stepsWithFloodWarning,
     currentLanes,
     isOffRoute,
+    isArrived,
   };
 }
