@@ -488,14 +488,15 @@ export async function getSmartRoute(origin, destination, floodPoints, vehicle = 
 }
 
 /**
- * Get route with active flood zone avoidance via waypoint injection.
- * On first call, behaves identically to getSmartRoute. If the best route
- * is flooded, computes bypass waypoints and retries once.
+ * Get route with flood zone awareness. Calls getSmartRoute and selects the
+ * best available Mapbox alternative using findSafestRoute's penalty scoring.
+ * If all alternatives pass through flooded zones, sets `unavoidable: true`
+ * to signal the caller that no dry path exists.
  * @param {Array} origin - [longitude, latitude]
  * @param {Array} destination - [longitude, latitude]
  * @param {Array} floodPoints - Array of flood hotspot objects
  * @param {Object|null} [vehicle=null] - Vehicle profile from PRESET_VEHICLES
- * @returns {Promise<Object>} { success, safeRoute, allRoutes, floodZones, warnings, unavoidable, origin, destination }
+ * @returns {Promise<Object>} { success, safeRoute, allRoutes, floodZones, warnings, historicalWarnings, unavoidable, origin, destination }
  */
 export async function getSmartRouteWithAvoidance(origin, destination, floodPoints, vehicle = null) {
     try {
