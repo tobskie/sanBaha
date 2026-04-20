@@ -38,14 +38,13 @@ async function main() {
   const run = await shouldScrape(db);
   if (!run) process.exit(0);
 
-  const email = process.env.FB_EMAIL;
-  const password = process.env.FB_PASSWORD;
-  if (!email || !password) throw new Error('FB_EMAIL and FB_PASSWORD env vars are required');
+  const cookieString = process.env.FB_COOKIES;
+  if (!cookieString) throw new Error('FB_COOKIES env var is required (see scraper/README for cookie export steps)');
 
   console.log('Starting FB scrape run...');
   let rawPosts;
   try {
-    rawPosts = await scrapeFbPosts({ email, password });
+    rawPosts = await scrapeFbPosts({ cookieString });
   } catch (err) {
     console.error('SCRAPER_ERROR:', err.message);
     process.exit(1);

@@ -12,22 +12,36 @@ const SCROLL_PASSES = 3;
 const MAX_POSTS_PER_SOURCE = 30;
 
 /**
- * Login to Facebook and search for flood posts.
- * @param {{ email: string, password: string }} credentials
+ * Scrape FB posts using a pre-authenticated session cookie string.
+ * @param {{ cookieString: string }} auth — raw Cookie header: "c_user=...; xs=...; datr=...; sb=..."
  * @returns {Promise<Array<{ postId, text, authorName, hasMedia, postedAt, postUrl }>>}
  */
-export async function scrapeFbPosts(credentials) {
+export async function scrapeFbPosts({ cookieString }) {
+  if (!cookieString || !cookieString.includes('c_user=') || !cookieString.includes('xs=')) {
+    throw new Error('SESSION_MISSING: FB_COOKIES secret must contain c_user and xs cookies');
+  }
+
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
     viewport: { width: 1366, height: 768 },
   });
+  await context.addCookies(parseCookies(cookieString));
+
   const page = await context.newPage();
   const posts = [];
 
   try {
-    await login(page, credentials);
+    // Confirm session is valid before hitting target pages
+    await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(3000);
+    const url = page.url();
+    const title = await page.title();
+    console.log(`session check: url=${url} title=${title}`);
+    if (url.includes('/login') || url.includes('/checkpoint')) {
+      throw new Error(`SESSION_EXPIRED: cookies rejected (${url}) — re-export from your browser`);
+    }
 
     for (const sourceUrl of SOURCES) {
       const sourcePosts = await scrapeSource(page, sourceUrl);
@@ -46,48 +60,27 @@ export async function scrapeFbPosts(credentials) {
   });
 }
 
-async function login(page, { email, password }) {
-  await page.goto('https://www.facebook.com/login', { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-
-  // Selectors differ between desktop (#email, #pass) and mobile (name=email, name=pass).
-  // Using name attributes works across both layouts.
-  await page.waitForSelector('input[name="email"]', { timeout: 20000 });
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="pass"]', password);
-
-  // Enumerate buttons before submitting so we can see what's actually in the DOM
-  const buttons = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('button, [role="button"], input[type="submit"]')).map(b => ({
-      tag: b.tagName,
-      name: b.getAttribute('name'),
-      type: b.getAttribute('type'),
-      id: b.id,
-      testid: b.getAttribute('data-testid'),
-      text: (b.innerText || b.value || '').substring(0, 40).replace(/\s+/g, ' '),
-    })).slice(0, 15);
-  });
-  console.log('pre-submit buttons:', JSON.stringify(buttons));
-
-  // Prefer a real user-like click on the login button
-  const clicked = await page.locator('button[name="login"], [data-testid="royal_login_button"], button[type="submit"]').first().click({ timeout: 5000 }).then(() => true).catch(() => false);
-  console.log(`login click: ${clicked}`);
-  if (!clicked) {
-    await page.press('input[name="pass"]', 'Enter');
-  }
-
-  await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
-  await page.waitForTimeout(6000);
-
-  const url = page.url();
-  const title = await page.title();
-  const bodySample = await page.evaluate(() => document.body.innerText.substring(0, 500).replace(/\s+/g, ' '));
-  console.log(`post-login: url=${url} title=${title}`);
-  console.log(`post-login body: ${bodySample}`);
-
-  if (url.includes('/login') || url.includes('/checkpoint') || url.includes('/two_factor')) {
-    throw new Error(`SESSION_EXPIRED: Facebook login failed or challenged (${url})`);
-  }
+// Parse "name=value; name=value" cookie header into Playwright cookie objects
+// scoped to .facebook.com.
+function parseCookies(cookieString) {
+  return cookieString
+    .split(';')
+    .map(c => c.trim())
+    .filter(Boolean)
+    .map(pair => {
+      const eq = pair.indexOf('=');
+      const name = pair.slice(0, eq).trim();
+      const value = pair.slice(eq + 1).trim();
+      return {
+        name,
+        value,
+        domain: '.facebook.com',
+        path: '/',
+        httpOnly: false,
+        secure: true,
+        sameSite: 'Lax',
+      };
+    });
 }
 
 async function scrapeSource(page, sourceUrl) {
