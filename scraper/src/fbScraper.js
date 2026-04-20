@@ -20,8 +20,8 @@ export async function scrapeFbPosts(credentials) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent:
-      'Mozilla/5.0 (Linux; Android 10; Pixel 3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Mobile Safari/537.36',
-    viewport: { width: 412, height: 915 },
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 768 },
   });
   const page = await context.newPage();
   const posts = [];
