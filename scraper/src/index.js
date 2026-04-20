@@ -76,6 +76,17 @@ export function evaluateFloodActive(input) {
   return { action: 'none', reason: 'below threshold' };
 }
 
+const SENSOR_FLOODED_CM = 70;
+
+async function anySensorFlooded(db) {
+  const snap = await db.ref('/flood_sensors').once('value');
+  const data = snap.val() || {};
+  return Object.values(data).some(sensor => {
+    const level = Number(sensor?.waterLevel);
+    return Number.isFinite(level) && level >= SENSOR_FLOODED_CM;
+  });
+}
+
 async function main() {
   initFirebase();
   const db = admin.database();
