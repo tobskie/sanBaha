@@ -1,15 +1,15 @@
 // scraper/src/fbScraper.js
 import { chromium } from 'playwright';
 
-const KEYWORDS = [
-  'baha lipa',
-  'flood lipa city',
-  'lipa baha',
-  'baha na lipa',
+// Public FB groups/pages to scrape. Search endpoint is blocked from datacenter IPs,
+// so we visit group feeds directly and let the confidence scorer filter flood posts.
+const SOURCES = [
+  'https://www.facebook.com/groups/lipacitynews/',
 ];
 
-const SCROLL_PAUSE_MS = 2000;
-const MAX_POSTS_PER_KEYWORD = 20;
+const SCROLL_PAUSE_MS = 2500;
+const SCROLL_PASSES = 3;
+const MAX_POSTS_PER_SOURCE = 30;
 
 /**
  * Login to Facebook and search for flood posts.
@@ -20,8 +20,8 @@ export async function scrapeFbPosts(credentials) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent:
-      'Mozilla/5.0 (Linux; Android 10; Pixel 3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Mobile Safari/537.36',
-    viewport: { width: 412, height: 915 },
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 768 },
   });
   const page = await context.newPage();
   const posts = [];
@@ -29,9 +29,9 @@ export async function scrapeFbPosts(credentials) {
   try {
     await login(page, credentials);
 
-    for (const keyword of KEYWORDS) {
-      const keywordPosts = await searchKeyword(page, keyword);
-      posts.push(...keywordPosts);
+    for (const sourceUrl of SOURCES) {
+      const sourcePosts = await scrapeSource(page, sourceUrl);
+      posts.push(...sourcePosts);
     }
   } finally {
     await browser.close();
@@ -48,28 +48,68 @@ export async function scrapeFbPosts(credentials) {
 
 async function login(page, { email, password }) {
   await page.goto('https://www.facebook.com/login', { waitUntil: 'domcontentloaded' });
-  await page.fill('#email', email);
-  await page.fill('#pass', password);
-  await page.click('[name="login"]');
-  await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 });
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-  // Check login succeeded — FB redirects away from /login on success
-  if (page.url().includes('/login')) {
-    throw new Error('SESSION_EXPIRED: Facebook login failed — check credentials');
+  // Selectors differ between desktop (#email, #pass) and mobile (name=email, name=pass).
+  // Using name attributes works across both layouts.
+  await page.waitForSelector('input[name="email"]', { timeout: 20000 });
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="pass"]', password);
+
+  // Enumerate buttons before submitting so we can see what's actually in the DOM
+  const buttons = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll('button, [role="button"], input[type="submit"]')).map(b => ({
+      tag: b.tagName,
+      name: b.getAttribute('name'),
+      type: b.getAttribute('type'),
+      id: b.id,
+      testid: b.getAttribute('data-testid'),
+      text: (b.innerText || b.value || '').substring(0, 40).replace(/\s+/g, ' '),
+    })).slice(0, 15);
+  });
+  console.log('pre-submit buttons:', JSON.stringify(buttons));
+
+  // Prefer a real user-like click on the login button
+  const clicked = await page.locator('button[name="login"], [data-testid="royal_login_button"], button[type="submit"]').first().click({ timeout: 5000 }).then(() => true).catch(() => false);
+  console.log(`login click: ${clicked}`);
+  if (!clicked) {
+    await page.press('input[name="pass"]', 'Enter');
+  }
+
+  await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(6000);
+
+  const url = page.url();
+  const title = await page.title();
+  const bodySample = await page.evaluate(() => document.body.innerText.substring(0, 500).replace(/\s+/g, ' '));
+  console.log(`post-login: url=${url} title=${title}`);
+  console.log(`post-login body: ${bodySample}`);
+
+  if (url.includes('/login') || url.includes('/checkpoint') || url.includes('/two_factor')) {
+    throw new Error(`SESSION_EXPIRED: Facebook login failed or challenged (${url})`);
   }
 }
 
-async function searchKeyword(page, keyword) {
-  // Base64-encoded filter for "Recent Posts" — keeps results fresh
-  const url = `https://www.facebook.com/search/posts?q=${encodeURIComponent(keyword)}&filters=eyJyZWNlbnRseVBvc3RlZCI6eyJuYW1lIjoiUmVjZW50IFBvc3RzIiwiYXJncyI6IiJ9fQ%3D%3D`;
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+async function scrapeSource(page, sourceUrl) {
+  await page.goto(sourceUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
   await page.waitForTimeout(SCROLL_PAUSE_MS);
 
-  // Scroll once to load more posts
-  await page.evaluate(() => window.scrollBy(0, 1500));
-  await page.waitForTimeout(SCROLL_PAUSE_MS);
+  // Scroll multiple times to load more posts — group feeds lazy-load
+  for (let i = 0; i < SCROLL_PASSES; i++) {
+    await page.evaluate(() => window.scrollBy(0, 2000));
+    await page.waitForTimeout(SCROLL_PAUSE_MS);
+  }
 
-  return extractPosts(page, MAX_POSTS_PER_KEYWORD);
+  const diag = await page.evaluate(() => ({
+    url: location.href,
+    title: document.title,
+    articleCount: document.querySelectorAll('[role="article"]').length,
+    feedCount: document.querySelectorAll('[role="feed"]').length,
+    bodySample: document.body.innerText.substring(0, 300).replace(/\s+/g, ' '),
+  }));
+  console.log(`[${sourceUrl}] DIAG:`, JSON.stringify(diag));
+
+  return extractPosts(page, MAX_POSTS_PER_SOURCE);
 }
 
 async function extractPosts(page, limit) {
