@@ -77,6 +77,16 @@ async function searchKeyword(page, keyword) {
   await page.evaluate(() => window.scrollBy(0, 1500));
   await page.waitForTimeout(SCROLL_PAUSE_MS);
 
+  // Diagnostics: log what FB is actually serving
+  const diag = await page.evaluate(() => ({
+    url: location.href,
+    title: document.title,
+    articleCount: document.querySelectorAll('[role="article"]').length,
+    feedCount: document.querySelectorAll('[role="feed"]').length,
+    bodySample: document.body.innerText.substring(0, 300).replace(/\s+/g, ' '),
+  }));
+  console.log(`[${keyword}] DIAG:`, JSON.stringify(diag));
+
   return extractPosts(page, MAX_POSTS_PER_KEYWORD);
 }
 
