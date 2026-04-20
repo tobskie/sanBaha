@@ -1,15 +1,15 @@
 // scraper/src/fbScraper.js
 import { chromium } from 'playwright';
 
-const KEYWORDS = [
-  'baha lipa',
-  'flood lipa city',
-  'lipa baha',
-  'baha na lipa',
+// Public FB groups/pages to scrape. Search endpoint is blocked from datacenter IPs,
+// so we visit group feeds directly and let the confidence scorer filter flood posts.
+const SOURCES = [
+  'https://www.facebook.com/groups/lipacitynews/',
 ];
 
-const SCROLL_PAUSE_MS = 2000;
-const MAX_POSTS_PER_KEYWORD = 20;
+const SCROLL_PAUSE_MS = 2500;
+const SCROLL_PASSES = 3;
+const MAX_POSTS_PER_SOURCE = 30;
 
 /**
  * Login to Facebook and search for flood posts.
@@ -29,9 +29,9 @@ export async function scrapeFbPosts(credentials) {
   try {
     await login(page, credentials);
 
-    for (const keyword of KEYWORDS) {
-      const keywordPosts = await searchKeyword(page, keyword);
-      posts.push(...keywordPosts);
+    for (const sourceUrl of SOURCES) {
+      const sourcePosts = await scrapeSource(page, sourceUrl);
+      posts.push(...sourcePosts);
     }
   } finally {
     await browser.close();
@@ -56,7 +56,7 @@ async function login(page, { email, password }) {
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="pass"]', password);
 
-  // Enumerate buttons so we can see what's actually in the DOM
+  // Enumerate buttons before submitting so we can see what's actually in the DOM
   const buttons = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('button, [role="button"], input[type="submit"]')).map(b => ({
       tag: b.tagName,
@@ -90,17 +90,16 @@ async function login(page, { email, password }) {
   }
 }
 
-async function searchKeyword(page, keyword) {
-  // Base64-encoded filter for "Recent Posts" — keeps results fresh
-  const url = `https://www.facebook.com/search/posts?q=${encodeURIComponent(keyword)}&filters=eyJyZWNlbnRseVBvc3RlZCI6eyJuYW1lIjoiUmVjZW50IFBvc3RzIiwiYXJncyI6IiJ9fQ%3D%3D`;
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+async function scrapeSource(page, sourceUrl) {
+  await page.goto(sourceUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
   await page.waitForTimeout(SCROLL_PAUSE_MS);
 
-  // Scroll once to load more posts
-  await page.evaluate(() => window.scrollBy(0, 1500));
-  await page.waitForTimeout(SCROLL_PAUSE_MS);
+  // Scroll multiple times to load more posts — group feeds lazy-load
+  for (let i = 0; i < SCROLL_PASSES; i++) {
+    await page.evaluate(() => window.scrollBy(0, 2000));
+    await page.waitForTimeout(SCROLL_PAUSE_MS);
+  }
 
-  // Diagnostics: log what FB is actually serving
   const diag = await page.evaluate(() => ({
     url: location.href,
     title: document.title,
@@ -108,9 +107,9 @@ async function searchKeyword(page, keyword) {
     feedCount: document.querySelectorAll('[role="feed"]').length,
     bodySample: document.body.innerText.substring(0, 300).replace(/\s+/g, ' '),
   }));
-  console.log(`[${keyword}] DIAG:`, JSON.stringify(diag));
+  console.log(`[${sourceUrl}] DIAG:`, JSON.stringify(diag));
 
-  return extractPosts(page, MAX_POSTS_PER_KEYWORD);
+  return extractPosts(page, MAX_POSTS_PER_SOURCE);
 }
 
 async function extractPosts(page, limit) {
