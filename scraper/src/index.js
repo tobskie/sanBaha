@@ -108,6 +108,9 @@ async function main() {
   console.log(`Scraped ${rawPosts.length} raw posts`);
 
   let written = 0;
+  let floodedPostsThisRun = 0;
+  const floodedAuthors = new Set();
+
   for (const raw of rawPosts) {
     const locationResult = extractLocation(raw.text);
     const confidence = scorePost({
@@ -119,8 +122,15 @@ async function main() {
     });
 
     const didWrite = await writePost({ ...raw, confidence }, locationResult);
-    if (didWrite) written++;
+    if (didWrite) {
+      written++;
+      if (confidence >= 0.7) {
+        floodedPostsThisRun++;
+        floodedAuthors.add(raw.authorName || 'Unknown');
+      }
+    }
   }
+  const uniqueAuthorsThisRun = floodedAuthors.size;
 
   await db.ref('/system').update({ lastScrapeAt: new Date().toISOString() });
   console.log(`Scrape complete — ${written} new posts written to /crowd_reports`);
