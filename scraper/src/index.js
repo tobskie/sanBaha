@@ -132,7 +132,40 @@ async function main() {
   }
   const uniqueAuthorsThisRun = floodedAuthors.size;
 
-  await db.ref('/system').update({ lastScrapeAt: new Date().toISOString() });
+  const systemSnap = await db.ref('/system').once('value');
+  const system = systemSnap.val() || {};
+  const currentlyActive = system.floodActive === true;
+  const floodActiveSetAtMs = system.floodActiveSetAt
+    ? new Date(system.floodActiveSetAt).getTime()
+    : null;
+
+  const sensorFlooded = await anySensorFlooded(db);
+  const nowMs = Date.now();
+  const decision = evaluateFloodActive({
+    floodedPostsThisRun,
+    uniqueAuthorsThisRun,
+    anySensorFlooded: sensorFlooded,
+    currentlyActive,
+    floodActiveSetAtMs,
+    nowMs,
+  });
+
+  console.log(
+    `floodActive eval: posts=${floodedPostsThisRun} authors=${uniqueAuthorsThisRun} ` +
+    `sensorFlooded=${sensorFlooded} currentlyOn=${currentlyActive} → ` +
+    `${decision.action.toUpperCase()} (${decision.reason})`
+  );
+
+  const updates = { lastScrapeAt: new Date(nowMs).toISOString() };
+  if (decision.action === 'on') {
+    updates.floodActive = true;
+    updates.floodActiveSetAt = new Date(nowMs).toISOString();
+  } else if (decision.action === 'off') {
+    updates.floodActive = false;
+    updates.floodActiveSetAt = null;
+  }
+  await db.ref('/system').update(updates);
+
   console.log(`Scrape complete — ${written} new posts written to /crowd_reports`);
   process.exit(0);
 }
