@@ -31,6 +31,51 @@ async function shouldScrape(db) {
   return false;
 }
 
+const GRACE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+/**
+ * Decide whether /system/floodActive should change based on this run's signals.
+ * Pure function — no I/O. Caller supplies current state + collected inputs.
+ *
+ * @param {object} input
+ * @param {number} input.floodedPostsThisRun     count of newly-written posts with severity='flooded'
+ * @param {number} input.uniqueAuthorsThisRun    distinct authors across those flooded posts
+ * @param {boolean} input.anySensorFlooded       true if any sensor's status is 'flooded'
+ * @param {boolean} input.currentlyActive        value of /system/floodActive before this run
+ * @param {number|null} input.floodActiveSetAtMs ms epoch of last ON refresh, or null
+ * @param {number} input.nowMs                   current time in ms
+ * @returns {{ action: 'on'|'off'|'none', reason: string }}
+ */
+export function evaluateFloodActive(input) {
+  const {
+    floodedPostsThisRun,
+    uniqueAuthorsThisRun,
+    anySensorFlooded,
+    currentlyActive,
+    floodActiveSetAtMs,
+    nowMs,
+  } = input;
+
+  const twoAuthorsRule  = uniqueAuthorsThisRun >= 2;
+  const postPlusSensor  = floodedPostsThisRun >= 1 && anySensorFlooded;
+  const onRuleFired     = twoAuthorsRule || postPlusSensor;
+
+  if (onRuleFired) {
+    const reason = twoAuthorsRule ? '2+ authors' : '1 post + sensor flooded';
+    return { action: 'on', reason };
+  }
+
+  if (currentlyActive) {
+    const age = floodActiveSetAtMs ? nowMs - floodActiveSetAtMs : Infinity;
+    if (age >= GRACE_MS) {
+      return { action: 'off', reason: `expired (ageMin=${Math.round(age / 60000)})` };
+    }
+    return { action: 'none', reason: `grace (ageMin=${Math.round(age / 60000)})` };
+  }
+
+  return { action: 'none', reason: 'below threshold' };
+}
+
 async function main() {
   initFirebase();
   const db = admin.database();
