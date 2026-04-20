@@ -48,14 +48,20 @@ export async function scrapeFbPosts(credentials) {
 
 async function login(page, { email, password }) {
   await page.goto('https://www.facebook.com/login', { waitUntil: 'domcontentloaded' });
-  await page.fill('#email', email);
-  await page.fill('#pass', password);
-  await page.click('[name="login"]');
-  await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 });
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-  // Check login succeeded — FB redirects away from /login on success
-  if (page.url().includes('/login')) {
-    throw new Error('SESSION_EXPIRED: Facebook login failed — check credentials');
+  // Selectors differ between desktop (#email, #pass) and mobile (name=email, name=pass).
+  // Using name attributes works across both layouts.
+  await page.waitForSelector('input[name="email"]', { timeout: 20000 });
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="pass"]', password);
+  await page.click('button[name="login"], [name="login"]');
+  await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(3000);
+
+  const url = page.url();
+  if (url.includes('/login') || url.includes('/checkpoint') || url.includes('/two_factor')) {
+    throw new Error(`SESSION_EXPIRED: Facebook login failed or challenged (${url})`);
   }
 }
 
