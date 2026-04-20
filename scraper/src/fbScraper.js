@@ -55,13 +55,24 @@ async function login(page, { email, password }) {
   await page.waitForSelector('input[name="email"]', { timeout: 20000 });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="pass"]', password);
-  // Submit via Enter key — works on both desktop and mobile layouts regardless
-  // of how the login button is wrapped (button vs div, varying attributes).
-  await page.press('input[name="pass"]', 'Enter');
+
+  // Try multiple submit strategies (FB layouts vary)
+  const submitted = await page.evaluate(() => {
+    const btn = document.querySelector('button[name="login"], button[type="submit"], [data-testid="royal_login_button"]');
+    if (btn) { btn.click(); return 'button'; }
+    const form = document.querySelector('form[action*="login"], form[id*="login"]');
+    if (form) { form.submit(); return 'form'; }
+    return 'none';
+  });
+  console.log(`login submit strategy: ${submitted}`);
+
   await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(5000);
 
   const url = page.url();
+  const title = await page.title();
+  console.log(`post-login: url=${url} title=${title}`);
+
   if (url.includes('/login') || url.includes('/checkpoint') || url.includes('/two_factor')) {
     throw new Error(`SESSION_EXPIRED: Facebook login failed or challenged (${url})`);
   }
