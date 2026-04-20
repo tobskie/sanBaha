@@ -1,6 +1,6 @@
 // scraper/src/confidenceScorer.js
 
-const FLOOD_KEYWORDS = ['baha', 'flood', 'bumabaha', 'pasig'];
+const FLOOD_KEYWORDS = ['baha', 'flood', 'bumabaha'];
 const MS_30_MIN = 30 * 60 * 1000;
 
 /**
