@@ -3,7 +3,6 @@ import { chromium } from 'playwright';
 
 const KEYWORDS = [
   'baha lipa',
-  'tubig lipa',
   'flood lipa city',
   'lipa baha',
   'baha na lipa',
