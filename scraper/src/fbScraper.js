@@ -7,8 +7,8 @@ const SOURCES = [
   'https://www.facebook.com/groups/lipacitynews/',
 ];
 
-const SCROLL_PAUSE_MS = 2500;
-const SCROLL_PASSES = 3;
+const SCROLL_PAUSE_MS = 3000;
+const SCROLL_PASSES = 8;
 const MAX_POSTS_PER_SOURCE = 30;
 
 /**
@@ -89,8 +89,10 @@ async function scrapeSource(page, sourceUrl) {
 
   // Scroll multiple times to load more posts — group feeds lazy-load
   for (let i = 0; i < SCROLL_PASSES; i++) {
-    await page.evaluate(() => window.scrollBy(0, 2000));
+    await page.evaluate(() => window.scrollBy(0, 2500));
     await page.waitForTimeout(SCROLL_PAUSE_MS);
+    const count = await page.evaluate(() => document.querySelectorAll('[role="article"]').length);
+    console.log(`  scroll ${i + 1}/${SCROLL_PASSES}: ${count} articles loaded`);
   }
 
   const diag = await page.evaluate(() => ({
@@ -112,14 +114,15 @@ async function extractPosts(page, limit) {
     const articles = Array.from(document.querySelectorAll('[role="article"]')).slice(0, maxPosts);
 
     for (const article of articles) {
+      // Require a permalink — filters out composer, pinned headers, group nav
+      const linkEl = article.querySelector('a[href*="/posts/"], a[href*="story_fbid"], a[href*="permalink"]');
+      const postUrl = linkEl?.href || '';
+      if (!postUrl) continue;
+      const postId = postUrl.match(/(?:story_fbid=|posts\/)(\d+)/)?.[1] || postUrl.slice(-20);
+
       // Extract post text
       const textEl = article.querySelector('[data-ad-preview="message"], [data-testid="post_message"]');
       const text = textEl?.innerText?.trim() || article.innerText?.substring(0, 500) || '';
-
-      // Extract post link (contains post ID)
-      const linkEl = article.querySelector('a[href*="/posts/"], a[href*="story_fbid"], a[href*="permalink"]');
-      const postUrl = linkEl?.href || '';
-      const postId = postUrl.match(/(?:story_fbid=|posts\/)(\d+)/)?.[1] || postUrl.slice(-20) || String(Date.now() + Math.random());
 
       // Check for media
       const hasMedia = !!(article.querySelector('img[src*="scontent"], video'));
