@@ -55,7 +55,9 @@ async function login(page, { email, password }) {
   await page.waitForSelector('input[name="email"]', { timeout: 20000 });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="pass"]', password);
-  await page.click('button[name="login"], [name="login"]');
+  // Submit via Enter key — works on both desktop and mobile layouts regardless
+  // of how the login button is wrapped (button vs div, varying attributes).
+  await page.press('input[name="pass"]', 'Enter');
   await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
   await page.waitForTimeout(3000);
 
