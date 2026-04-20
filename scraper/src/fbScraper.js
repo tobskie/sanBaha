@@ -56,22 +56,34 @@ async function login(page, { email, password }) {
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="pass"]', password);
 
-  // Try multiple submit strategies (FB layouts vary)
-  const submitted = await page.evaluate(() => {
-    const btn = document.querySelector('button[name="login"], button[type="submit"], [data-testid="royal_login_button"]');
-    if (btn) { btn.click(); return 'button'; }
-    const form = document.querySelector('form[action*="login"], form[id*="login"]');
-    if (form) { form.submit(); return 'form'; }
-    return 'none';
+  // Enumerate buttons so we can see what's actually in the DOM
+  const buttons = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll('button, [role="button"], input[type="submit"]')).map(b => ({
+      tag: b.tagName,
+      name: b.getAttribute('name'),
+      type: b.getAttribute('type'),
+      id: b.id,
+      testid: b.getAttribute('data-testid'),
+      text: (b.innerText || b.value || '').substring(0, 40).replace(/\s+/g, ' '),
+    })).slice(0, 15);
   });
-  console.log(`login submit strategy: ${submitted}`);
+  console.log('pre-submit buttons:', JSON.stringify(buttons));
+
+  // Prefer a real user-like click on the login button
+  const clicked = await page.locator('button[name="login"], [data-testid="royal_login_button"], button[type="submit"]').first().click({ timeout: 5000 }).then(() => true).catch(() => false);
+  console.log(`login click: ${clicked}`);
+  if (!clicked) {
+    await page.press('input[name="pass"]', 'Enter');
+  }
 
   await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
-  await page.waitForTimeout(5000);
+  await page.waitForTimeout(6000);
 
   const url = page.url();
   const title = await page.title();
+  const bodySample = await page.evaluate(() => document.body.innerText.substring(0, 500).replace(/\s+/g, ' '));
   console.log(`post-login: url=${url} title=${title}`);
+  console.log(`post-login body: ${bodySample}`);
 
   if (url.includes('/login') || url.includes('/checkpoint') || url.includes('/two_factor')) {
     throw new Error(`SESSION_EXPIRED: Facebook login failed or challenged (${url})`);
